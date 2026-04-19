@@ -72,21 +72,27 @@ export function AuthShell() {
     }
 
     if (mode === "signin" && response.data.session) {
-      setSession(response.data.session);
+      try {
+        setSession(response.data.session);
 
-      const workspaceData = await ensureWorkspaceForUser(supabase, response.data.session.user);
-      setWorkspaceState({
-        userName: workspaceData.appUser.nombre,
-        email: workspaceData.appUser.email,
-        workspaceId: workspaceData.workspace.id,
-      });
+        const workspaceData = await ensureWorkspaceForUser(supabase, response.data.session.user);
+        setWorkspaceState({
+          userName: workspaceData.appUser.nombre,
+          email: workspaceData.appUser.email,
+          workspaceId: workspaceData.workspace.id,
+        });
+        setMessage("Sesión iniciada correctamente.");
+      } catch (error) {
+        setSession(null);
+        const detail = error instanceof Error ? error.message : "Error desconocido";
+        setMessage(`Entró, pero falló la creación o lectura del workspace: ${detail}`);
+      }
+
+      setLoading(null);
+      return;
     }
 
-    setMessage(
-      mode === "signup"
-        ? "Cuenta creada. Revise su correo si Supabase pide confirmación."
-        : "Sesión iniciada correctamente.",
-    );
+    setMessage("Cuenta creada. Revise su correo si Supabase pide confirmación.");
     setLoading(null);
   }
 
