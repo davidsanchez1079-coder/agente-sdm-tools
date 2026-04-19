@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { createCase, createFolder, listCases, listFolders } from "@/lib/workspace/folders";
+import {
+  createCase,
+  createFolder,
+  deleteCase,
+  deleteFolder,
+  listCases,
+  listFolders,
+} from "@/lib/workspace/folders";
 import { createMessage, listMessages } from "@/lib/workspace/messages";
 import { buildGeneralAgentResponse } from "@/lib/agent/general-response";
 import { buildSpecialistAgentResponse } from "@/lib/agent/specialist-response";
@@ -100,6 +107,30 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
     setLoadingFolders(false);
   }
 
+  async function handleDeleteFolder(folderId: string) {
+    setLoadingFolders(true);
+    setMessage(null);
+
+    try {
+      await deleteFolder(supabase, folderId);
+      setFolders((prev) => prev.filter((folder) => folder.id !== folderId));
+
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null);
+        setCases([]);
+        setSelectedCase(null);
+        setMessages([]);
+      }
+
+      setMessage("Carpeta eliminada correctamente.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "No se pudo eliminar la carpeta.";
+      setMessage(`Falló eliminar carpeta: ${detail}`);
+    }
+
+    setLoadingFolders(false);
+  }
+
   async function handleSelectFolder(folderId: string) {
     setSelectedFolderId(folderId);
     setLoadingCases(true);
@@ -144,6 +175,28 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
     } catch (error) {
       const detail = error instanceof Error ? error.message : "No se pudo crear el caso.";
       setMessage(`Falló crear caso: ${detail}`);
+    }
+
+    setLoadingCases(false);
+  }
+
+  async function handleDeleteCase(caseId: string) {
+    setLoadingCases(true);
+    setMessage(null);
+
+    try {
+      await deleteCase(supabase, caseId);
+      setCases((prev) => prev.filter((caseItem) => caseItem.id !== caseId));
+
+      if (selectedCase?.id === caseId) {
+        setSelectedCase(null);
+        setMessages([]);
+      }
+
+      setMessage("Caso eliminado correctamente.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "No se pudo eliminar el caso.";
+      setMessage(`Falló eliminar caso: ${detail}`);
     }
 
     setLoadingCases(false);
@@ -280,18 +333,29 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           <div className="grid gap-2">
             {folders.length ? (
               folders.map((folder) => (
-                <button
+                <div
                   key={folder.id}
-                  className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                  className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition ${
                     selectedFolderId === folder.id
                       ? "border-emerald-400 bg-emerald-400/10 text-emerald-200"
                       : "border-slate-800 bg-slate-900 text-slate-200 hover:border-slate-700"
                   }`}
-                  type="button"
-                  onClick={() => void handleSelectFolder(folder.id)}
                 >
-                  {folder.nombre}
-                </button>
+                  <button
+                    className="flex-1 text-left"
+                    type="button"
+                    onClick={() => void handleSelectFolder(folder.id)}
+                  >
+                    {folder.nombre}
+                  </button>
+                  <button
+                    className="rounded-xl border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
+                    type="button"
+                    onClick={() => void handleDeleteFolder(folder.id)}
+                  >
+                    Borrar
+                  </button>
+                </div>
               ))
             ) : (
               <p className="text-sm text-slate-400">Todavía no hay carpetas creadas.</p>
@@ -381,30 +445,39 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               <p className="text-sm text-slate-400">Cargando casos...</p>
             ) : cases.length ? (
               cases.map((caseItem) => (
-                <button
+                <div
                   key={caseItem.id}
-                  className={`rounded-2xl border p-4 text-left transition ${
+                  className={`rounded-2xl border p-4 transition ${
                     selectedCase?.id === caseItem.id
                       ? "border-cyan-400 bg-cyan-400/10"
                       : "border-slate-800 bg-slate-900"
                   }`}
-                  type="button"
-                  onClick={() => void handleSelectCase(caseItem)}
                 >
-                  <p className="text-sm font-medium text-white">{caseItem.titulo}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
-                    {caseItem.estado}
-                  </p>
-                  {caseItem.cliente ? (
-                    <p className="mt-2 text-sm text-slate-300">Cliente: {caseItem.cliente}</p>
-                  ) : null}
-                  {caseItem.operacion ? (
-                    <p className="mt-1 text-sm text-slate-400">Operación: {caseItem.operacion}</p>
-                  ) : null}
-                  {caseItem.material ? (
-                    <p className="mt-1 text-sm text-slate-400">Material: {caseItem.material}</p>
-                  ) : null}
-                </button>
+                  <div className="flex items-start justify-between gap-3">
+                    <button className="flex-1 text-left" type="button" onClick={() => void handleSelectCase(caseItem)}>
+                      <p className="text-sm font-medium text-white">{caseItem.titulo}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
+                        {caseItem.estado}
+                      </p>
+                      {caseItem.cliente ? (
+                        <p className="mt-2 text-sm text-slate-300">Cliente: {caseItem.cliente}</p>
+                      ) : null}
+                      {caseItem.operacion ? (
+                        <p className="mt-1 text-sm text-slate-400">Operación: {caseItem.operacion}</p>
+                      ) : null}
+                      {caseItem.material ? (
+                        <p className="mt-1 text-sm text-slate-400">Material: {caseItem.material}</p>
+                      ) : null}
+                    </button>
+                    <button
+                      className="rounded-xl border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
+                      type="button"
+                      onClick={() => void handleDeleteCase(caseItem.id)}
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                </div>
               ))
             ) : (
               <p className="text-sm text-slate-400">
@@ -460,7 +533,9 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                     {entry.author === "user" ? "Usuario" : "Agente"}
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">{entry.content}</p>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
+                    {entry.content}
+                  </p>
                 </article>
               ))
             ) : (

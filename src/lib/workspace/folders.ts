@@ -53,6 +53,11 @@ export async function createFolder(
   return data;
 }
 
+export async function deleteFolder(supabase: SupabaseClient, folderId: string) {
+  const { error } = await supabase.from("folders").delete().eq("id", folderId);
+  if (error) throw error;
+}
+
 export async function listCases(supabase: SupabaseClient, folderId: string) {
   const { data, error } = await supabase
     .from("cases")
@@ -96,4 +101,9 @@ export async function createCase(
 
   if (error) throw error;
   return data;
+}
+
+export async function deleteCase(supabase: SupabaseClient, caseId: string) {
+  const { error } = await supabase.from("cases").delete().eq("id", caseId);
+  if (error) throw error;
 }
