@@ -170,6 +170,11 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
 
     try {
       const userMessage = await createMessage(supabase, selectedCase.id, "user", chatInput.trim());
+      const historyContext = messages.map((entry) => ({
+        author: entry.author,
+        content: entry.content,
+      }));
+
       const agentMessage = await createMessage(
         supabase,
         selectedCase.id,
@@ -182,6 +187,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           material: selectedCase.material,
           maquina: selectedCase.maquina,
           marcaPreferida: selectedCase.marca_preferida,
+          history: historyContext,
         }),
       );
 
