@@ -1,13 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import type { Session } from "@supabase/supabase-js";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
 import { isAllowedEmail } from "@/lib/auth/allowed-emails";
-import { ensureWorkspaceForUser } from "@/lib/workspace/bootstrap";
-import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
 export function AuthShell() {
   const env = getClientEnv();
@@ -18,17 +15,12 @@ export function AuthShell() {
     () => (isConfigured ? getSupabaseBrowserClient() : null),
     [isConfigured],
   );
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<"signin" | "signup" | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [workspaceState, setWorkspaceState] = useState<{
-    userName: string;
-    email: string;
-    workspaceId: string;
-  } | null>(null);
 
   const authStatus = searchParams.get("auth");
   const callbackMessage =
@@ -36,7 +28,9 @@ export function AuthShell() {
       ? "Correo confirmado correctamente. Ya puede iniciar sesión."
       : authStatus === "missing-code"
         ? "El enlace de confirmación llegó incompleto. Pida uno nuevo."
-        : null;
+        : authStatus === "workspace-error"
+          ? "Inició sesión pero falló la preparación del workspace. Inténtelo de nuevo."
+          : null;
 
   async function handleAuth(mode: "signin" | "signup") {
     if (!supabase) {
@@ -47,7 +41,9 @@ export function AuthShell() {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!isAllowedEmail(normalizedEmail)) {
-      setMessage("Acceso restringido. Este correo no está autorizado para entrar.");
+      setMessage(
+        "Acceso restringido. Este correo no está autorizado para entrar.",
+      );
       return;
     }
 
@@ -63,7 +59,10 @@ export function AuthShell() {
               emailRedirectTo: `${window.location.origin}/auth/callback`,
             },
           })
-        : await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+        : await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
+          });
 
     if (response.error) {
       setMessage(response.error.message);
@@ -72,38 +71,12 @@ export function AuthShell() {
     }
 
     if (mode === "signin" && response.data.session) {
-      try {
-        setSession(response.data.session);
-
-        const workspaceData = await ensureWorkspaceForUser(supabase, response.data.session.user);
-        setWorkspaceState({
-          userName: workspaceData.appUser.nombre,
-          email: workspaceData.appUser.email,
-          workspaceId: workspaceData.workspace.id,
-        });
-        setMessage("Sesión iniciada correctamente.");
-      } catch (error) {
-        setSession(null);
-        const detail = error instanceof Error ? error.message : "Error desconocido";
-        setMessage(`Entró, pero falló la creación o lectura del workspace: ${detail}`);
-      }
-
-      setLoading(null);
+      router.replace("/app");
       return;
     }
 
     setMessage("Cuenta creada. Revise su correo si Supabase pide confirmación.");
     setLoading(null);
-  }
-
-  if (session && workspaceState) {
-    return (
-      <WorkspaceShell
-        userName={workspaceState.userName}
-        email={workspaceState.email}
-        workspaceId={workspaceState.workspaceId}
-      />
-    );
   }
 
   return (
@@ -112,10 +85,12 @@ export function AuthShell() {
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
           Acceso controlado
         </p>
-        <h2 className="text-2xl font-semibold text-white">Solo usuarios autorizados</h2>
+        <h2 className="text-2xl font-semibold text-white">
+          Solo usuarios autorizados
+        </h2>
         <p className="text-sm leading-7 text-slate-300">
-          El acceso quedó restringido a correos autorizados. El registro abierto ya no está
-          disponible en esta etapa.
+          El acceso quedó restringido a correos autorizados. El registro abierto
+          ya no está disponible en esta etapa.
         </p>
       </div>
 
