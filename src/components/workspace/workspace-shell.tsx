@@ -196,8 +196,8 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
         </article>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[0.8fr_0.9fr_1.1fr]">
-        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-[0.8fr_0.9fr_1.1fr]">
+        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-1">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-white">Carpetas</h3>
             <button
@@ -248,7 +248,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-1">
           <div className="space-y-1">
             <h3 className="text-lg font-semibold text-white">Casos</h3>
             <p className="text-sm text-slate-400">
@@ -315,7 +315,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-2 xl:col-span-1">
           <div className="space-y-1">
             <h3 className="text-lg font-semibold text-white">Detalle del caso</h3>
             <p className="text-sm text-slate-400">
@@ -327,7 +327,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
 
           <div className="grid gap-3">
             <textarea
-              className="min-h-28 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-emerald-400"
+              className="min-h-36 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-emerald-400"
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
               placeholder="Escriba el contexto técnico del caso"
@@ -359,7 +359,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                     {entry.author === "user" ? "Usuario" : "Agente"}
                   </p>
-                  <p className="mt-2 text-sm leading-7 text-slate-100">{entry.content}</p>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">{entry.content}</p>
                 </article>
               ))
             ) : (
