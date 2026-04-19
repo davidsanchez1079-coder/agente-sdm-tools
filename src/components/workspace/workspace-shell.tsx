@@ -412,7 +412,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
             {loadingMessages ? (
               <p className="text-sm text-slate-400">Cargando conversación...</p>
             ) : messages.length ? (
-              messages.map((entry) => (
+              [...messages].reverse().map((entry) => (
                 <article
                   key={entry.id}
                   className={`rounded-2xl border p-4 ${
