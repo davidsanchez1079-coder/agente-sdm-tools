@@ -45,12 +45,16 @@ create table public.cases (
   estado text not null default 'abierto' check (
     estado in (
       'abierto',
-      'en_prueba',
-      'cerrado_exito',
-      'cerrado_sin_exito',
-      'cerrado_sin_datos'
+      'en_proceso',
+      'detenido',
+      'cerrado'
     )
   ),
+  prioridad text not null default 'media' check (
+    prioridad in ('baja', 'media', 'alta', 'crítica')
+  ),
+  siguiente_accion text,
+  resumen_ejecutivo text,
   shared_from_case_id uuid references public.cases(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
