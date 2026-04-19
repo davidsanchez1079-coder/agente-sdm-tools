@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, createFolder, listCases, listFolders } from "@/lib/workspace/folders";
 import { createMessage, listMessages } from "@/lib/workspace/messages";
 import { buildGeneralAgentResponse } from "@/lib/agent/general-response";
+import { buildSpecialistAgentResponse } from "@/lib/agent/specialist-response";
 
 type WorkspaceShellProps = {
   userName: string;
@@ -33,6 +34,8 @@ type CaseItem = {
   created_at: string;
 };
 
+type AgentMode = "general" | "sandvik" | "vargus" | "korloy" | "dormer" | "boehlerit";
+
 export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellProps) {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -46,6 +49,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
   const [caseMaterial, setCaseMaterial] = useState("");
   const [caseMaquina, setCaseMaquina] = useState("");
   const [caseMarca, setCaseMarca] = useState("");
+  const [agentMode, setAgentMode] = useState<AgentMode>("general");
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState<
     {
@@ -175,20 +179,36 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
         content: entry.content,
       }));
 
+      const agentContent =
+        agentMode === "general"
+          ? buildGeneralAgentResponse({
+              caseTitle: selectedCase.titulo,
+              client: selectedCase.cliente,
+              message: chatInput.trim(),
+              operacion: selectedCase.operacion,
+              material: selectedCase.material,
+              maquina: selectedCase.maquina,
+              marcaPreferida: selectedCase.marca_preferida,
+              history: historyContext,
+            })
+          : buildSpecialistAgentResponse({
+              caseTitle: selectedCase.titulo,
+              client: selectedCase.cliente,
+              message: chatInput.trim(),
+              operacion: selectedCase.operacion,
+              material: selectedCase.material,
+              maquina: selectedCase.maquina,
+              marcaPreferida: selectedCase.marca_preferida,
+              history: historyContext,
+              mode: agentMode,
+            });
+
       const agentMessage = await createMessage(
         supabase,
         selectedCase.id,
         "agent",
-        buildGeneralAgentResponse({
-          caseTitle: selectedCase.titulo,
-          client: selectedCase.cliente,
-          message: chatInput.trim(),
-          operacion: selectedCase.operacion,
-          material: selectedCase.material,
-          maquina: selectedCase.maquina,
-          marcaPreferida: selectedCase.marca_preferida,
-          history: historyContext,
-        }),
+        agentContent,
+        agentMode,
       );
 
       setMessages((prev) => [...prev, userMessage, agentMessage]);
@@ -285,6 +305,22 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
             <p className="text-sm text-slate-400">
               Seleccione una carpeta para ver y crear casos asociados.
             </p>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Modo del agente</label>
+            <select
+              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              value={agentMode}
+              onChange={(event) => setAgentMode(event.target.value as AgentMode)}
+            >
+              <option value="general">General</option>
+              <option value="sandvik">Especialista Sandvik</option>
+              <option value="vargus">Especialista Vargus</option>
+              <option value="korloy">Especialista Korloy</option>
+              <option value="dormer">Especialista Dormer</option>
+              <option value="boehlerit">Especialista Boehlerit</option>
+            </select>
           </div>
 
           <div className="grid gap-3">
