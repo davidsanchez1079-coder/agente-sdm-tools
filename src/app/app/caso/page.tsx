@@ -13,17 +13,17 @@ export default function CasoIndexPage() {
   const [refreshToken, setRefreshToken] = useState(0);
 
   return (
-    <section className="grid min-w-0 gap-5">
-      <header>
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-emerald-300">
+    <section className="grid min-w-0 gap-6">
+      <header className="space-y-2">
+        <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
           Caso
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold text-white">
+        </span>
+        <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           Carpetas y casos
         </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-          Selecciona una carpeta para ver sus casos. Toca un caso para abrir su
-          conversación con el agente.
+        <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+          Selecciona una carpeta para ver sus casos. Toca un caso para abrir
+          su conversación con el agente.
         </p>
       </header>
 
@@ -35,10 +35,12 @@ export default function CasoIndexPage() {
           onMessage={setMessage}
         />
 
-        <section className="grid min-w-0 gap-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 lg:p-5">
+        <section className="grid min-w-0 gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
           <div>
-            <h3 className="text-lg font-semibold text-white">Casos</h3>
-            <p className="mt-1 text-sm text-slate-400">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Casos
+            </h3>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               {selectedFolderId
                 ? "Casos de la carpeta seleccionada."
                 : "Selecciona una carpeta para ver sus casos."}
@@ -60,7 +62,7 @@ export default function CasoIndexPage() {
       </div>
 
       {message ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
+        <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-300 dark:shadow-none">
           {message}
         </div>
       ) : null}

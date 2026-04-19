@@ -119,13 +119,15 @@ export function FolderPanel({
   }
 
   return (
-    <section className="grid min-w-0 gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 lg:p-5">
+    <section className="grid min-w-0 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-lg font-semibold text-white">Carpetas</h3>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Carpetas
+        </h3>
         <button
           type="button"
           onClick={() => void reload()}
-          className="rounded-xl border border-slate-700 px-3 py-2 text-xs text-slate-200 transition hover:border-emerald-400 hover:text-emerald-300"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200"
         >
           {loading ? "Cargando…" : "Recargar"}
         </button>
@@ -133,7 +135,7 @@ export function FolderPanel({
 
       <div className="grid gap-3">
         <input
-          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-50 outline-none transition focus:border-emerald-400"
+          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
           value={folderName}
           onChange={(event) => setFolderName(event.target.value)}
           placeholder="Nombre de carpeta"
@@ -142,7 +144,7 @@ export function FolderPanel({
           type="button"
           onClick={() => void handleCreate()}
           disabled={loading || !folderName.trim()}
-          className="rounded-xl bg-emerald-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
         >
           {loading ? "Procesando…" : "Crear carpeta"}
         </button>
@@ -150,33 +152,36 @@ export function FolderPanel({
 
       <div className="grid gap-2">
         {folders.length ? (
-          folders.map((folder) => (
-            <div
-              key={folder.id}
-              className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm transition ${
-                selectedFolderId === folder.id
-                  ? "border-emerald-400 bg-emerald-400/10 text-emerald-200"
-                  : "border-slate-800 bg-slate-900 text-slate-200 hover:border-slate-700"
-              }`}
-            >
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate text-left"
-                onClick={() => onSelectFolder(folder.id)}
+          folders.map((folder) => {
+            const selected = selectedFolderId === folder.id;
+            return (
+              <div
+                key={folder.id}
+                className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition ${
+                  selected
+                    ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 shadow-[inset_3px_0_0_0_rgb(5_150_105)] dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100 dark:shadow-[inset_3px_0_0_0_rgb(52_211_153)]"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                }`}
               >
-                {folder.nombre}
-              </button>
-              <button
-                type="button"
-                className="shrink-0 rounded-lg border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
-                onClick={() => void handleDelete(folder.id)}
-              >
-                Borrar
-              </button>
-            </div>
-          ))
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate text-left font-medium"
+                  onClick={() => onSelectFolder(folder.id)}
+                >
+                  {folder.nombre}
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                  onClick={() => void handleDelete(folder.id)}
+                >
+                  Borrar
+                </button>
+              </div>
+            );
+          })
         ) : (
-          <p className="text-sm leading-6 text-slate-400">
+          <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
             Todavía no hay carpetas.
           </p>
         )}
