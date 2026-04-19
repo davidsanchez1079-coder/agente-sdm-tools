@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CaseEstado, CasePrioridad } from "@/lib/cases/cases";
+import type {
+  CaseEstado,
+  CasePrioridad,
+  CaseResultadoCierre,
+} from "@/lib/cases/cases";
 
 type FolderRow = {
   id: string;
@@ -22,11 +26,14 @@ export type CaseRow = {
   prioridad: CasePrioridad;
   siguiente_accion: string | null;
   resumen_ejecutivo: string | null;
+  resultado_cierre: CaseResultadoCierre | null;
+  requiere_rap: boolean;
+  potencial_usd: number | null;
   created_at: string;
 };
 
 const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, created_at";
+  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_at";
 
 export async function listFolders(supabase: SupabaseClient, workspaceId: string) {
   const { data, error } = await supabase
@@ -117,6 +124,9 @@ export type UpdateCasePatch = Partial<{
   prioridad: CasePrioridad;
   siguiente_accion: string | null;
   resumen_ejecutivo: string | null;
+  resultado_cierre: CaseResultadoCierre | null;
+  requiere_rap: boolean;
+  potencial_usd: number | null;
 }>;
 
 export async function updateCase(

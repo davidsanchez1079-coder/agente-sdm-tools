@@ -2,6 +2,12 @@ export type CaseEstado = "abierto" | "en_proceso" | "detenido" | "cerrado";
 
 export type CasePrioridad = "baja" | "media" | "alta" | "crítica";
 
+export type CaseResultadoCierre =
+  | "exito"
+  | "parcial"
+  | "sin_resultado"
+  | "cancelado";
+
 export const CASE_ESTADOS: { id: CaseEstado; label: string }[] = [
   { id: "abierto", label: "Abierto" },
   { id: "en_proceso", label: "En proceso" },
@@ -14,6 +20,16 @@ export const CASE_PRIORIDADES: { id: CasePrioridad; label: string }[] = [
   { id: "media", label: "Media" },
   { id: "alta", label: "Alta" },
   { id: "crítica", label: "Crítica" },
+];
+
+export const CASE_RESULTADOS_CIERRE: {
+  id: CaseResultadoCierre;
+  label: string;
+}[] = [
+  { id: "exito", label: "Éxito" },
+  { id: "parcial", label: "Parcial" },
+  { id: "sin_resultado", label: "Sin resultado" },
+  { id: "cancelado", label: "Cancelado" },
 ];
 
 export const ESTADO_BADGE: Record<CaseEstado, string> = {
@@ -36,6 +52,17 @@ export const PRIORIDAD_BADGE: Record<CasePrioridad, string> = {
     "border-rose-500/40 bg-rose-100 text-rose-800 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-200",
 };
 
+export const RESULTADO_CIERRE_BADGE: Record<CaseResultadoCierre, string> = {
+  exito:
+    "border-emerald-500/40 bg-emerald-100 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200",
+  parcial:
+    "border-amber-500/40 bg-amber-100 text-amber-800 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200",
+  sin_resultado:
+    "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300",
+  cancelado:
+    "border-rose-500/40 bg-rose-100 text-rose-800 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-200",
+};
+
 const FALLBACK_BADGE =
   "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300";
 
@@ -45,6 +72,12 @@ export function estadoBadge(estado: string): string {
 
 export function prioridadBadge(prioridad: string): string {
   return PRIORIDAD_BADGE[prioridad as CasePrioridad] ?? FALLBACK_BADGE;
+}
+
+export function resultadoCierreBadge(resultado: string): string {
+  return (
+    RESULTADO_CIERRE_BADGE[resultado as CaseResultadoCierre] ?? FALLBACK_BADGE
+  );
 }
 
 export function estadoLabel(estado: string): string {
@@ -59,4 +92,24 @@ export function prioridadLabel(prioridad: string): string {
     CASE_PRIORIDADES.find((row) => row.id === (prioridad as CasePrioridad))
       ?.label ?? prioridad
   );
+}
+
+export function resultadoCierreLabel(resultado: string): string {
+  return (
+    CASE_RESULTADOS_CIERRE.find(
+      (row) => row.id === (resultado as CaseResultadoCierre),
+    )?.label ?? resultado
+  );
+}
+
+const USD_FORMAT = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+export function formatPotencialUsd(value: number | null): string {
+  if (value == null) return "No registrado";
+  return USD_FORMAT.format(value);
 }
