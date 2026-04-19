@@ -55,6 +55,12 @@ create table public.cases (
   ),
   siguiente_accion text,
   resumen_ejecutivo text,
+  resultado_cierre text check (
+    resultado_cierre is null
+    or resultado_cierre in ('exito', 'parcial', 'sin_resultado', 'cancelado')
+  ),
+  requiere_rap boolean not null default false,
+  potencial_usd integer check (potencial_usd is null or potencial_usd >= 0),
   shared_from_case_id uuid references public.cases(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

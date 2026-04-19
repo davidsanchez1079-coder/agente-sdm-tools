@@ -11,12 +11,17 @@ import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import {
   CASE_ESTADOS,
   CASE_PRIORIDADES,
+  CASE_RESULTADOS_CIERRE,
   estadoBadge,
   estadoLabel,
+  formatPotencialUsd,
   prioridadBadge,
   prioridadLabel,
+  resultadoCierreBadge,
+  resultadoCierreLabel,
   type CaseEstado,
   type CasePrioridad,
+  type CaseResultadoCierre,
 } from "@/lib/cases/cases";
 import {
   MODULE_BAR,
@@ -60,7 +65,7 @@ function describeFabricante(marcaPreferida: string | null) {
 }
 
 const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, created_at";
+  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, created_at";
 
 export function CaseDetail({ caseId }: CaseDetailProps) {
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
@@ -74,10 +79,14 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
   const [resumenDraft, setResumenDraft] = useState("");
   const [siguienteDraft, setSiguienteDraft] = useState("");
+  const [potencialDraft, setPotencialDraft] = useState("");
   const [savingResumen, setSavingResumen] = useState(false);
   const [savingSiguiente, setSavingSiguiente] = useState(false);
   const [savingEstado, setSavingEstado] = useState(false);
   const [savingPrioridad, setSavingPrioridad] = useState(false);
+  const [savingResultado, setSavingResultado] = useState(false);
+  const [savingRap, setSavingRap] = useState(false);
+  const [savingPotencial, setSavingPotencial] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +108,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         setCaseItem(caseData);
         setResumenDraft(caseData.resumen_ejecutivo ?? "");
         setSiguienteDraft(caseData.siguiente_accion ?? "");
+        setPotencialDraft(
+          caseData.potencial_usd != null
+            ? String(caseData.potencial_usd)
+            : "",
+        );
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
 
         const msgs = await listMessages(supabase, caseId);
@@ -204,6 +218,87 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     }
   }
 
+  async function handleChangeResultado(
+    resultado: CaseResultadoCierre | null,
+  ) {
+    if (!caseItem || caseItem.resultado_cierre === resultado) return;
+    setSavingResultado(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        resultado_cierre: resultado,
+      });
+      setCaseItem(updated);
+      setMessage("Resultado de cierre actualizado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el resultado de cierre.",
+      );
+    } finally {
+      setSavingResultado(false);
+    }
+  }
+
+  async function handleSavePotencial() {
+    if (!caseItem) return;
+    const raw = potencialDraft.trim().replace(/[,\s]/g, "");
+    const parsed = raw === "" ? null : Number(raw);
+    if (parsed !== null && (Number.isNaN(parsed) || parsed < 0)) {
+      setMessage("Valor inválido para potencial. Usa un entero ≥ 0.");
+      return;
+    }
+    setSavingPotencial(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        potencial_usd: parsed === null ? null : Math.trunc(parsed),
+      });
+      setCaseItem(updated);
+      setPotencialDraft(
+        updated.potencial_usd != null ? String(updated.potencial_usd) : "",
+      );
+      setMessage("Potencial USD guardado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar el potencial.",
+      );
+    } finally {
+      setSavingPotencial(false);
+    }
+  }
+
+  async function handleChangeRap(requiereRap: boolean) {
+    if (!caseItem || caseItem.requiere_rap === requiereRap) return;
+    setSavingRap(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        requiere_rap: requiereRap,
+      });
+      setCaseItem(updated);
+      setMessage(
+        requiereRap
+          ? "Marcado como Requiere RAP."
+          : "Se quitó la marca Requiere RAP.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el flag de RAP.",
+      );
+    } finally {
+      setSavingRap(false);
+    }
+  }
+
   async function handleSend() {
     if (!caseItem || !chatInput.trim()) return;
     setSending(true);
@@ -301,6 +396,15 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   if (!caseItem) return null;
 
   const fabricanteLabel = describeFabricante(caseItem.marca_preferida);
+  const potencialRaw = potencialDraft.trim().replace(/[,\s]/g, "");
+  const potencialNum = potencialRaw === "" ? null : Number(potencialRaw);
+  const potencialInvalid =
+    potencialRaw !== "" &&
+    (Number.isNaN(potencialNum as number) || (potencialNum as number) < 0);
+  const potencialDirty =
+    !potencialInvalid &&
+    (caseItem.potencial_usd ?? null) !==
+      (potencialNum === null ? null : Math.trunc(potencialNum as number));
   const resumenDirty =
     (caseItem.resumen_ejecutivo ?? "") !== resumenDraft.trim() &&
     resumenDraft.trim() !== "";
@@ -352,6 +456,18 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           >
             Prioridad {prioridadLabel(caseItem.prioridad)}
           </span>
+          {caseItem.resultado_cierre ? (
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${resultadoCierreBadge(caseItem.resultado_cierre)}`}
+            >
+              {resultadoCierreLabel(caseItem.resultado_cierre)}
+            </span>
+          ) : null}
+          {caseItem.requiere_rap ? (
+            <span className="rounded-full border border-violet-500/40 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200">
+              Requiere RAP
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -399,6 +515,55 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             </select>
           </label>
         </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Potencial (USD)
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Valor estimado del caso en dólares. Opcional. Ayuda a priorizar.
+          </p>
+          <p className="mt-1 text-xs font-semibold text-slate-900 dark:text-slate-100">
+            Registrado: {formatPotencialUsd(caseItem.potencial_usd)}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 dark:text-slate-400">
+              $
+            </span>
+            <input
+              className={`${controlClass} pl-7`}
+              type="text"
+              inputMode="numeric"
+              value={potencialDraft}
+              onChange={(event) => setPotencialDraft(event.target.value)}
+              placeholder="0"
+              disabled={savingPotencial}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleSavePotencial()}
+            disabled={
+              savingPotencial || potencialInvalid || !potencialDirty
+            }
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
+          >
+            {savingPotencial ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+        {potencialInvalid ? (
+          <span className="text-xs text-rose-600 dark:text-rose-300">
+            Ingresa un entero mayor o igual a 0.
+          </span>
+        ) : potencialDirty ? (
+          <span className="text-xs text-amber-600 dark:text-amber-300">
+            Sin guardar
+          </span>
+        ) : null}
       </div>
 
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
@@ -466,6 +631,86 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           ) : null}
         </div>
       </div>
+
+      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Cierre formal
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {caseItem.estado === "cerrado"
+              ? "Desenlace del caso y bandera de reporte. Puedes dejar los campos sin registrar si no aplican."
+              : "Puedes preparar estos datos antes de cerrar el caso. Quedan vinculados al cierre cuando cambies el estado a Cerrado."}
+          </p>
+        </div>
+
+        <label className="grid gap-1.5 text-sm">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Resultado de cierre
+          </span>
+          <select
+            className={controlClass}
+            value={caseItem.resultado_cierre ?? ""}
+            onChange={(event) => {
+              const raw = event.target.value;
+              void handleChangeResultado(
+                raw === "" ? null : (raw as CaseResultadoCierre),
+              );
+            }}
+            disabled={savingResultado}
+          >
+            <option value="">No registrado</option>
+            {CASE_RESULTADOS_CIERRE.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:border-violet-500/40 dark:border-slate-800/80 dark:bg-slate-950/40 dark:hover:border-violet-400/40">
+          <input
+            type="checkbox"
+            checked={caseItem.requiere_rap}
+            onChange={(event) => void handleChangeRap(event.target.checked)}
+            disabled={savingRap}
+            className="mt-0.5 h-4 w-4 rounded border-slate-400 text-violet-600 focus:ring-2 focus:ring-violet-500/30 dark:border-slate-600 dark:bg-slate-950 dark:text-violet-400"
+          />
+          <div className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-slate-900 dark:text-white">
+              Requiere RAP
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+              Marca si el caso requiere Reporte de Ahorros y Productividad.
+              Opcional; se puede activar en cualquier momento y revisar al
+              cierre.
+            </span>
+          </div>
+        </label>
+      </div>
+
+      {caseItem.requiere_rap ? (
+        <div className="relative overflow-hidden rounded-2xl border border-violet-500/30 bg-violet-50/60 p-5 shadow-sm dark:border-violet-400/30 dark:bg-violet-500/5 dark:shadow-none before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-violet-500 dark:before:bg-violet-400">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-violet-500/40 bg-violet-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200">
+              Reporte de Ahorros y Productividad
+            </span>
+            <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              Próximamente
+            </span>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-800 dark:text-slate-200">
+            Este caso está marcado como Requiere RAP. Aquí vivirá la
+            sección específica para capturar los datos del reporte formal
+            cuando el módulo se construya.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-400">
+            Por ahora solo está el flag. Esta área queda reservada para los
+            campos del RAP (mediciones, indicadores, comparativos y
+            entrega) en una ronda posterior.
+          </p>
+        </div>
+      ) : null}
 
       <section className="grid gap-3">
         <header>
