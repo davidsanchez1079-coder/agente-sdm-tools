@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
+import { isAllowedEmail } from "@/lib/auth/allowed-emails";
 
 export function AuthShell() {
   const env = getClientEnv();
@@ -34,19 +35,26 @@ export function AuthShell() {
       return;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!isAllowedEmail(normalizedEmail)) {
+      setMessage("Acceso restringido. Este correo no está autorizado para entrar.");
+      return;
+    }
+
     setLoading(mode);
     setMessage(null);
 
     const response =
       mode === "signup"
         ? await supabase.auth.signUp({
-            email,
+            email: normalizedEmail,
             password,
             options: {
               emailRedirectTo: `${window.location.origin}/auth/callback`,
             },
           })
-        : await supabase.auth.signInWithPassword({ email, password });
+        : await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
 
     if (response.error) {
       setMessage(response.error.message);
@@ -66,12 +74,12 @@ export function AuthShell() {
     <section className="grid gap-6 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-950/10">
       <div className="space-y-2">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
-          Acceso base
+          Acceso controlado
         </p>
-        <h2 className="text-2xl font-semibold text-white">Conexión inicial con Supabase</h2>
+        <h2 className="text-2xl font-semibold text-white">Solo usuarios autorizados</h2>
         <p className="text-sm leading-7 text-slate-300">
-          Este bloque deja listo el login base para Fase 1. Todavía no define roles,
-          workspace ni lógica de negocio.
+          El acceso quedó restringido a correos autorizados. El registro abierto ya no está
+          disponible en esta etapa.
         </p>
       </div>
 
@@ -117,12 +125,11 @@ export function AuthShell() {
           </button>
 
           <button
-            className="rounded-2xl border border-slate-700 px-4 py-3 font-medium text-slate-100 transition hover:border-cyan-400 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-2xl border border-slate-700 px-4 py-3 font-medium text-slate-500 transition disabled:cursor-not-allowed"
             type="button"
-            onClick={() => void handleAuth("signup")}
-            disabled={loading !== null}
+            disabled
           >
-            {loading === "signup" ? "Procesando..." : "Crear cuenta"}
+            Solo usuarios autorizados
           </button>
         </div>
       </form>
