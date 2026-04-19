@@ -1,6 +1,12 @@
 "use client";
 
 import { useWorkspace } from "@/lib/workspace/context";
+import {
+  MODULE_BAR,
+  MODULE_CHIP,
+  MODULE_ICON_BG,
+} from "@/lib/modules/modules";
+import { ModuleIcon } from "@/components/ui/module-icon";
 
 export default function UsuarioPage() {
   const { appUser } = useWorkspace();
@@ -10,10 +16,21 @@ export default function UsuarioPage() {
 
   return (
     <section className="grid gap-6">
-      <header className="space-y-2">
-        <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
-          Usuario
-        </span>
+      <header
+        className={`relative space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.usuario}`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl ${MODULE_ICON_BG.usuario}`}
+          >
+            <ModuleIcon id="usuario" />
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${MODULE_CHIP.usuario}`}
+          >
+            Usuario
+          </span>
+        </div>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           {displayName}
         </h2>

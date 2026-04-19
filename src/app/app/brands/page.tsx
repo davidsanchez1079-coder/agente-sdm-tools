@@ -1,6 +1,12 @@
 "use client";
 
 import { BRANDS, type BrandStatus } from "@/lib/brands/brands";
+import {
+  MODULE_BAR,
+  MODULE_CHIP,
+  MODULE_ICON_BG,
+} from "@/lib/modules/modules";
+import { ModuleIcon } from "@/components/ui/module-icon";
 
 const STATUS_LABEL: Record<BrandStatus, string> = {
   always: "Siempre disponible",
@@ -22,10 +28,21 @@ const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 export default function BrandsPage() {
   return (
     <section className="grid gap-6">
-      <header className="space-y-2">
-        <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
-          Fabricante/Marca
-        </span>
+      <header
+        className={`relative space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.brands}`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl ${MODULE_ICON_BG.brands}`}
+          >
+            <ModuleIcon id="brands" />
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${MODULE_CHIP.brands}`}
+          >
+            Fabricante/Marca
+          </span>
+        </div>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           Catálogo de fabricantes
         </h2>
@@ -40,7 +57,7 @@ export default function BrandsPage() {
         {FABRICANTES.map((brand) => (
           <article
             key={brand.id}
-            className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-150 hover:border-emerald-500/40 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-emerald-400/40 dark:hover:bg-slate-900/70"
+            className="relative grid gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 pl-6 shadow-sm transition duration-150 hover:border-amber-500/40 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-amber-400/40 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-amber-500/70 dark:before:bg-amber-400/70"
           >
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">

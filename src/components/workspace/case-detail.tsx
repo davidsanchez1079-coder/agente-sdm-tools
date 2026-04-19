@@ -7,6 +7,12 @@ import { createMessage, listMessages } from "@/lib/workspace/messages";
 import { buildGeneralAgentResponse } from "@/lib/agent/general-response";
 import { buildSpecialistAgentResponse } from "@/lib/agent/specialist-response";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
+import {
+  MODULE_BAR,
+  MODULE_CHIP,
+  MODULE_ICON_BG,
+} from "@/lib/modules/modules";
+import { ModuleIcon } from "@/components/ui/module-icon";
 import { AgentModeSelect } from "./agent-mode-select";
 
 type CaseRow = {
@@ -206,14 +212,21 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
   return (
     <section className="grid min-w-0 gap-6">
-      <div className="space-y-2">
+      <div
+        className={`relative space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.caso}`}
+      >
         <Link
           href="/app/caso"
-          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-300"
+          className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 transition hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200"
         >
           ← Volver a casos
         </Link>
         <div className="flex flex-wrap items-center gap-3">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl ${MODULE_ICON_BG.caso}`}
+          >
+            <ModuleIcon id="caso" />
+          </div>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             {caseItem.titulo}
           </h2>
@@ -221,6 +234,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             {caseItem.estado}
           </span>
         </div>
+        <span
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${MODULE_CHIP.caso}`}
+        >
+          Caso
+        </span>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -3,14 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  MODULES,
+  MODULE_ACTIVE_NAV,
+  type ModuleId,
+} from "@/lib/modules/modules";
+import { ModuleIcon } from "@/components/ui/module-icon";
 
-const NAV = [
-  { href: "/app", label: "Dashboard", short: "DB" },
-  { href: "/app/usuario", label: "Usuario", short: "Us" },
-  { href: "/app/customers", label: "Cliente", short: "Cl" },
-  { href: "/app/caso", label: "Caso", short: "Cs" },
-  { href: "/app/brands", label: "Fabricante/Marca", short: "Fa" },
-] as const;
+const NAV_ORDER: ModuleId[] = [
+  "dashboard",
+  "usuario",
+  "customers",
+  "caso",
+  "brands",
+];
 
 type SidebarProps = {
   userName: string;
@@ -49,7 +55,7 @@ export function Sidebar({
   return (
     <>
       <aside
-        className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-5 border-r bg-white/90 p-4 shadow-sm transition-[width] duration-200 lg:flex dark:border-slate-800/80 dark:bg-slate-900/60 dark:shadow-none dark:backdrop-blur ${asideWidth}`}
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-5 border-r border-slate-200 bg-white/90 p-4 shadow-sm transition-[width] duration-200 lg:flex dark:border-slate-800/80 dark:bg-slate-900/60 dark:shadow-none dark:backdrop-blur ${asideWidth}`}
       >
         <div
           className={`flex items-center gap-2 ${collapsed ? "justify-center" : "justify-between"}`}
@@ -76,12 +82,13 @@ export function Sidebar({
         </div>
 
         <nav className="flex flex-col gap-1">
-          {NAV.map((item) => {
+          {NAV_ORDER.map((id) => {
+            const item = MODULES[id];
             const active = isActive(pathname, item.href);
             const base =
-              "rounded-xl text-sm transition flex items-center border";
+              "rounded-xl text-sm transition flex items-center border gap-3";
             const state = active
-              ? "border-emerald-500/30 bg-emerald-50 text-emerald-800 shadow-[inset_3px_0_0_0_rgb(5_150_105)] dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-100 dark:shadow-[inset_3px_0_0_0_rgb(52_211_153)]"
+              ? MODULE_ACTIVE_NAV[id]
               : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-800 dark:hover:bg-slate-900/80";
             const size = collapsed
               ? "h-10 w-full justify-center px-0"
@@ -93,12 +100,9 @@ export function Sidebar({
                 title={collapsed ? item.label : undefined}
                 className={`${base} ${state} ${size}`}
               >
-                {collapsed ? (
-                  <span className="text-xs font-semibold tracking-wider">
-                    {item.short}
-                  </span>
-                ) : (
-                  <span className="font-medium">{item.label}</span>
+                <ModuleIcon id={id} className="h-5 w-5 shrink-0" />
+                {collapsed ? null : (
+                  <span className="truncate font-medium">{item.label}</span>
                 )}
               </Link>
             );
@@ -177,18 +181,20 @@ export function Sidebar({
       </header>
 
       <nav className="sticky top-[3.25rem] z-10 flex gap-1 overflow-x-auto border-b border-slate-200 bg-white/80 px-3 py-2 lg:hidden dark:border-slate-800/80 dark:bg-slate-900/60">
-        {NAV.map((item) => {
+        {NAV_ORDER.map((id) => {
+          const item = MODULES[id];
           const active = isActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
                 active
-                  ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-200"
+                  ? MODULE_ACTIVE_NAV[id]
                   : "border-transparent text-slate-700 hover:border-slate-200 dark:text-slate-300 dark:hover:border-slate-800"
               }`}
             >
+              <ModuleIcon id={id} className="h-4 w-4" />
               {item.label}
             </Link>
           );
