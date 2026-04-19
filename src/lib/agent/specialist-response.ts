@@ -17,22 +17,51 @@ type SpecialistAgentInput = {
   mode: SpecialistMode;
 };
 
-function labelForMode(mode: SpecialistMode) {
-  switch (mode) {
-    case "sandvik":
-      return "Sandvik Coromant";
-    case "vargus":
-      return "Vargus";
-    case "korloy":
-      return "Korloy";
-    case "dormer":
-      return "Dormer Pramet";
-    case "boehlerit":
-      return "Boehlerit";
-    default:
-      return "General";
-  }
-}
+type BrandRule = {
+  label: string;
+  focus: string;
+  allowedScope: string;
+  forbidden: string;
+  nextStep: string;
+};
+
+const BRAND_RULES: Record<Exclude<SpecialistMode, "general">, BrandRule> = {
+  sandvik: {
+    label: "Sandvik Coromant",
+    focus: "torneado, fresado y barrenado de alto desempeño con criterio de aplicación estable",
+    allowedScope: "puedo recomendar familias, enfoque de geometría, grado y criterio de aplicación compatibles con Sandvik, sin fingir clave exacta no confirmada",
+    forbidden: "no debo mezclar recomendaciones de Korloy, Vargus, Dormer o Boehlerit como si fueran equivalentes directos dentro de la misma respuesta especialista",
+    nextStep: "cerrar familia de solución, objetivo de corte y rango inicial de parámetros dentro del marco Sandvik",
+  },
+  vargus: {
+    label: "Vargus",
+    focus: "roscado, ranurado y herramientas especializadas donde la geometría de aplicación manda",
+    allowedScope: "puedo orientar sobre línea de solución, tipo de rosca, perfil y estrategia de aplicación compatibles con Vargus",
+    forbidden: "no debo inventar insertos exactos ni brincar a marcas de torneado general si la consulta sigue en carril Vargus",
+    nextStep: "definir estándar de rosca, perfil, paso, diámetro y si la aplicación es interna, externa o especial",
+  },
+  korloy: {
+    label: "Korloy",
+    focus: "torneado y fresado productivo con énfasis comercial/técnico en relación costo-rendimiento",
+    allowedScope: "puedo sugerir criterio de geometría, estabilidad y dirección de solución dentro del marco Korloy",
+    forbidden: "no debo presentar referencias de Sandvik o Dormer como respuesta principal si el modo activo es Korloy",
+    nextStep: "definir si la prioridad es costo por pieza, disponibilidad, agresividad de corte o vida de herramienta",
+  },
+  dormer: {
+    label: "Dormer Pramet",
+    focus: "barrenado, fresado, torneado y herramientas de corte estándar con enfoque práctico de aplicación",
+    allowedScope: "puedo recomendar familias de solución y criterio de uso compatible con Dormer Pramet",
+    forbidden: "no debo salir del carril Dormer hacia propuestas mixtas sin que el usuario cambie de modo",
+    nextStep: "cerrar tipo de herramienta, diámetro, profundidad útil y condición de máquina para aterrizar recomendación",
+  },
+  boehlerit: {
+    label: "Boehlerit",
+    focus: "mecanizado robusto con atención a estabilidad, materiales demandantes y consistencia de proceso",
+    allowedScope: "puedo orientar geometría, grado y criterio de aplicación compatibles con Boehlerit sin fingir SKU exacto",
+    forbidden: "no debo mezclar respuesta multimarca ni asumir catálogo no confirmado",
+    nextStep: "confirmar material, operación, estabilidad de montaje y meta de productividad para aterrizar solución",
+  },
+};
 
 export function buildSpecialistAgentResponse({
   caseTitle,
@@ -44,15 +73,21 @@ export function buildSpecialistAgentResponse({
   marcaPreferida,
   mode,
 }: SpecialistAgentInput) {
-  const brand = labelForMode(mode);
+  if (mode === "general") {
+    return "Modo general activo. Este generador no debería usarse para general.";
+  }
+
+  const rule = BRAND_RULES[mode];
 
   return [
-    `Modo especialista activo: ${brand}. Caso \"${caseTitle}\"${client ? ` con ${client}` : ""}.`,
+    `Modo especialista activo: ${rule.label}. Caso \"${caseTitle}\"${client ? ` con ${client}` : ""}.`,
     `Marco técnico actual: ${operacion || "operación por confirmar"} sobre ${material || "material por confirmar"}${maquina ? ` en máquina ${maquina}` : ""}.`,
     marcaPreferida ? `Preferencia comercial registrada: ${marcaPreferida}.` : null,
-    `Respuesta especialista inicial: voy a priorizar criterios compatibles con ${brand}, pero sin inventar todavía una clave exacta de inserto o herramienta si no está soportada por catálogo o reglas de marca.`,
-    `Siguiente enfoque sobre su mensaje (\"${message}\"): bajar la recomendación a geometría, familia de herramienta y criterio de aplicación dentro del marco de ${brand}.`,
-    "Dato faltante para cerrar recomendación: herramienta exacta, sujeción, profundidad de corte, avance objetivo, vida esperada y si la prioridad es desbaste, acabado, estabilidad, rebaba o control de desgaste.",
+    `Enfoque de marca: ${rule.focus}.`,
+    `Alcance permitido: ${rule.allowedScope}.`,
+    `Límite del muro de marcas: ${rule.forbidden}.`,
+    `Lectura inicial de su mensaje (\"${message}\"): responderé dentro del carril de ${rule.label}, sin brincar a una recomendación multimarca disfrazada.`,
+    `Siguiente paso técnico: ${rule.nextStep}.`,
   ]
     .filter(Boolean)
     .join("\n\n");
