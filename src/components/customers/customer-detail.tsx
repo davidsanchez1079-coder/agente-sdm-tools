@@ -7,6 +7,12 @@ import type {
   Customer,
   CustomerStatus,
 } from "@/lib/customers/customers";
+import {
+  MODULE_BAR,
+  MODULE_CHIP,
+  MODULE_ICON_BG,
+} from "@/lib/modules/modules";
+import { ModuleIcon } from "@/components/ui/module-icon";
 
 type CaseRow = {
   id: string;
@@ -71,14 +77,21 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
 
   return (
     <section className="grid min-w-0 gap-6">
-      <div className="space-y-2">
+      <div
+        className={`relative space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.customers}`}
+      >
         <Link
           href="/app/customers"
-          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-300"
+          className="inline-flex items-center gap-1 text-xs font-medium text-cyan-600 transition hover:text-cyan-700 dark:text-cyan-300 dark:hover:text-cyan-200"
         >
           ← Cliente
         </Link>
         <div className="flex flex-wrap items-center gap-3">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl ${MODULE_ICON_BG.customers}`}
+          >
+            <ModuleIcon id="customers" />
+          </div>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             {customer.label}
           </h2>
@@ -88,6 +101,11 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
             {customer.estatus}
           </span>
         </div>
+        <span
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${MODULE_CHIP.customers}`}
+        >
+          {customer.segmento}
+        </span>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -134,7 +152,7 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
               <Link
                 key={row.id}
                 href={`/app/caso/${row.id}`}
-                className="group rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-150 hover:border-cyan-500/50 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-cyan-400/50 dark:hover:bg-slate-900/70"
+                className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-5 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-emerald-400/50 dark:hover:bg-slate-900/70 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-emerald-500/70 dark:before:bg-emerald-400/70"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -155,7 +173,7 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
                       </p>
                     ) : null}
                   </div>
-                  <span className="shrink-0 text-xs text-slate-400 transition group-hover:text-cyan-600 dark:text-slate-500 dark:group-hover:text-cyan-300">
+                  <span className="shrink-0 text-xs font-semibold text-emerald-600 transition group-hover:translate-x-0.5 dark:text-emerald-300">
                     →
                   </span>
                 </div>

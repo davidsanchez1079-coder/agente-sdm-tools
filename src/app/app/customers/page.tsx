@@ -7,6 +7,12 @@ import {
   CUSTOMERS,
   type CustomerStatus,
 } from "@/lib/customers/customers";
+import {
+  MODULE_BAR,
+  MODULE_CHIP,
+  MODULE_ICON_BG,
+} from "@/lib/modules/modules";
+import { ModuleIcon } from "@/components/ui/module-icon";
 
 const STATUS_BADGE: Record<CustomerStatus, string> = {
   activo:
@@ -62,10 +68,21 @@ export default function CustomersPage() {
 
   return (
     <section className="grid gap-6">
-      <header className="space-y-2">
-        <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
-          Cliente
-        </span>
+      <header
+        className={`relative space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.customers}`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl ${MODULE_ICON_BG.customers}`}
+          >
+            <ModuleIcon id="customers" />
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${MODULE_CHIP.customers}`}
+          >
+            Cliente
+          </span>
+        </div>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           Catálogo de clientes
         </h2>
@@ -82,7 +99,7 @@ export default function CustomersPage() {
             <Link
               key={customer.id}
               href={`/app/customers/${customer.id}`}
-              className="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-emerald-400/50 dark:hover:bg-slate-900/70"
+              className="group relative grid gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 pl-6 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:border-cyan-500/50 hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-cyan-400/50 dark:hover:bg-slate-900/70 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-cyan-500/70 dark:before:bg-cyan-400/70"
             >
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">
@@ -102,8 +119,11 @@ export default function CustomersPage() {
                   ? "Cargando casos…"
                   : `${count} ${count === 1 ? "caso" : "casos"} en tu workspace`}
               </p>
-              <span className="mt-1 text-xs text-slate-400 transition group-hover:text-emerald-600 dark:text-slate-500 dark:group-hover:text-emerald-300">
-                Abrir detalle →
+              <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-cyan-600 transition group-hover:text-cyan-700 dark:text-cyan-300 dark:group-hover:text-cyan-200">
+                Abrir detalle
+                <span aria-hidden className="transition group-hover:translate-x-0.5">
+                  →
+                </span>
               </span>
             </Link>
           );
