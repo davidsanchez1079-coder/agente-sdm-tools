@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, createFolder, listCases, listFolders } from "@/lib/workspace/folders";
+import { createMessage, listMessages } from "@/lib/workspace/messages";
 
 type WorkspaceShellProps = {
   userName: string;
@@ -32,12 +33,25 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
   const [folders, setFolders] = useState<Folder[]>([]);
   const [cases, setCases] = useState<CaseItem[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedCase, setSelectedCase] = useState<CaseItem | null>(null);
   const [folderName, setFolderName] = useState("");
   const [caseTitle, setCaseTitle] = useState("");
   const [caseClient, setCaseClient] = useState("");
+  const [chatInput, setChatInput] = useState("");
+  const [messages, setMessages] = useState<
+    {
+      id: string;
+      case_id: string;
+      author: "user" | "agent";
+      content: string;
+      mode_used: "general" | "sandvik" | "vargus" | "korloy" | "dormer" | "boehlerit";
+      created_at: string;
+    }[]
+  >([]);
   const [message, setMessage] = useState<string | null>(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingCases, setLoadingCases] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   async function handleLoadFolders() {
     setLoadingFolders(true);
@@ -57,6 +71,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
   async function handleCreateFolder() {
     if (!folderName.trim()) return;
 
+    setLoadingFolders(true);
     setMessage(null);
 
     try {
@@ -65,8 +80,11 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
       setFolderName("");
       setMessage("Carpeta creada correctamente.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo crear la carpeta.");
+      const detail = error instanceof Error ? error.message : "No se pudo crear la carpeta.";
+      setMessage(`Falló crear carpeta: ${detail}`);
     }
+
+    setLoadingFolders(false);
   }
 
   async function handleSelectFolder(folderId: string) {
@@ -88,6 +106,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
   async function handleCreateCase() {
     if (!selectedFolderId || !caseTitle.trim()) return;
 
+    setLoadingCases(true);
     setMessage(null);
 
     try {
@@ -102,8 +121,54 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
       setCaseClient("");
       setMessage("Caso creado correctamente.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo crear el caso.");
+      const detail = error instanceof Error ? error.message : "No se pudo crear el caso.";
+      setMessage(`Falló crear caso: ${detail}`);
     }
+
+    setLoadingCases(false);
+  }
+
+  async function handleSelectCase(caseItem: CaseItem) {
+    setSelectedCase(caseItem);
+    setLoadingMessages(true);
+    setMessage(null);
+
+    try {
+      const rows = await listMessages(supabase, caseItem.id);
+      setMessages(rows);
+      setMessage(rows.length ? "Caso cargado correctamente." : "Caso listo para iniciar conversación.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "No se pudieron cargar mensajes.";
+      setMessage(`Falló cargar mensajes: ${detail}`);
+    }
+
+    setLoadingMessages(false);
+  }
+
+  async function handleSendMessage() {
+    if (!selectedCase || !chatInput.trim()) return;
+
+    setLoadingMessages(true);
+    setMessage(null);
+
+    try {
+      const userMessage = await createMessage(supabase, selectedCase.id, "user", chatInput.trim());
+      const agentMessage = await createMessage(
+        supabase,
+        selectedCase.id,
+        "agent",
+        `Recibí su mensaje sobre el caso \"${selectedCase.titulo}\". El siguiente bloque conectará el agente técnico real.`,
+      );
+
+      setMessages((prev) => [...prev, userMessage, agentMessage]);
+      setChatInput("");
+      setMessage("Mensaje guardado en el caso.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "No se pudo guardar el mensaje.";
+      setMessage(`Falló enviar mensaje: ${detail}`);
+    }
+
+    setLoadingMessages(false);
   }
 
   return (
@@ -131,7 +196,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
         </article>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid gap-6 lg:grid-cols-[0.8fr_0.9fr_1.1fr]">
         <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-white">Carpetas</h3>
@@ -152,11 +217,12 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               placeholder="Nombre de carpeta"
             />
             <button
-              className="rounded-2xl bg-emerald-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-emerald-300"
+              className="rounded-2xl bg-emerald-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               onClick={() => void handleCreateFolder()}
+              disabled={loadingFolders}
             >
-              Crear carpeta
+              {loadingFolders ? "Creando..." : "Crear carpeta"}
             </button>
           </div>
 
@@ -209,9 +275,9 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               className="rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               onClick={() => void handleCreateCase()}
-              disabled={!selectedFolderId}
+              disabled={!selectedFolderId || loadingCases}
             >
-              Crear caso
+              {loadingCases ? "Creando..." : "Crear caso"}
             </button>
           </div>
 
@@ -220,9 +286,15 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               <p className="text-sm text-slate-400">Cargando casos...</p>
             ) : cases.length ? (
               cases.map((caseItem) => (
-                <article
+                <button
                   key={caseItem.id}
-                  className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    selectedCase?.id === caseItem.id
+                      ? "border-cyan-400 bg-cyan-400/10"
+                      : "border-slate-800 bg-slate-900"
+                  }`}
+                  type="button"
+                  onClick={() => void handleSelectCase(caseItem)}
                 >
                   <p className="text-sm font-medium text-white">{caseItem.titulo}</p>
                   <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
@@ -231,13 +303,70 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                   {caseItem.cliente ? (
                     <p className="mt-2 text-sm text-slate-300">Cliente: {caseItem.cliente}</p>
                   ) : null}
-                </article>
+                </button>
               ))
             ) : (
               <p className="text-sm text-slate-400">
                 {selectedFolderId
                   ? "Esta carpeta todavía no tiene casos."
                   : "Primero seleccione una carpeta."}
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-white">Detalle del caso</h3>
+            <p className="text-sm text-slate-400">
+              {selectedCase
+                ? `Conversación del caso: ${selectedCase.titulo}`
+                : "Seleccione un caso para abrir su conversación."}
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            <textarea
+              className="min-h-28 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-emerald-400"
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder="Escriba el contexto técnico del caso"
+              disabled={!selectedCase}
+            />
+            <button
+              className="rounded-2xl bg-emerald-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              onClick={() => void handleSendMessage()}
+              disabled={!selectedCase || loadingMessages}
+            >
+              {loadingMessages ? "Guardando..." : "Enviar al caso"}
+            </button>
+          </div>
+
+          <div className="grid gap-3">
+            {loadingMessages ? (
+              <p className="text-sm text-slate-400">Cargando conversación...</p>
+            ) : messages.length ? (
+              messages.map((entry) => (
+                <article
+                  key={entry.id}
+                  className={`rounded-2xl border p-4 ${
+                    entry.author === "user"
+                      ? "border-emerald-500/30 bg-emerald-500/5"
+                      : "border-cyan-500/30 bg-cyan-500/5"
+                  }`}
+                >
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                    {entry.author === "user" ? "Usuario" : "Agente"}
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-slate-100">{entry.content}</p>
+                </article>
+              ))
+            ) : (
+              <p className="text-sm text-slate-400">
+                {selectedCase
+                  ? "Este caso todavía no tiene mensajes."
+                  : "Primero seleccione un caso."}
               </p>
             )}
           </div>
