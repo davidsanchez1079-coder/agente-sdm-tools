@@ -275,34 +275,39 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
     setLoadingMessages(false);
   }
 
+  const panelClass =
+    "grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 lg:p-5 min-w-0";
+  const inputClass =
+    "w-full min-w-0 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-50 outline-none transition focus:border-cyan-400";
+
   return (
-    <section className="grid gap-6 rounded-3xl border border-emerald-500/20 bg-slate-900/80 p-6 shadow-2xl shadow-emerald-950/10">
+    <section className="grid gap-5 rounded-3xl border border-emerald-500/20 bg-slate-900/80 p-4 shadow-2xl shadow-emerald-950/10 sm:p-6">
       <div className="space-y-2">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300">
           Workspace activo
         </p>
         <h2 className="text-2xl font-semibold text-white">Bienvenido, {userName}</h2>
-        <p className="text-sm leading-7 text-slate-300">
+        <p className="text-sm leading-6 text-slate-300">
           Ya hay estructura viva para carpetas y casos. El siguiente bloque será refinar la
           navegación y conectar el chat del agente a cada caso.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Correo</p>
-          <p className="mt-2 text-sm text-slate-100">{email}</p>
+          <p className="mt-2 break-words text-sm text-slate-100">{email}</p>
         </article>
 
-        <article className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+        <article className="min-w-0 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Workspace ID</p>
           <p className="mt-2 break-all text-sm text-slate-100">{workspaceId}</p>
         </article>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-[0.8fr_0.9fr_1.1fr]">
-        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-1">
-          <div className="flex items-center justify-between gap-3">
+      <div className="grid gap-5 xl:grid-cols-[320px_360px_minmax(0,1fr)]">
+        <section className={panelClass}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-lg font-semibold text-white">Carpetas</h3>
             <button
               className="rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300"
@@ -315,13 +320,13 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
 
           <div className="grid gap-3">
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-emerald-400"
+              className={inputClass.replace("focus:border-cyan-400", "focus:border-emerald-400")}
               value={folderName}
               onChange={(event) => setFolderName(event.target.value)}
               placeholder="Nombre de carpeta"
             />
             <button
-              className="rounded-2xl bg-emerald-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-emerald-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               onClick={() => void handleCreateFolder()}
               disabled={loadingFolders}
@@ -335,21 +340,21 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               folders.map((folder) => (
                 <div
                   key={folder.id}
-                  className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm transition ${
+                  className={`flex min-w-0 items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm transition ${
                     selectedFolderId === folder.id
                       ? "border-emerald-400 bg-emerald-400/10 text-emerald-200"
                       : "border-slate-800 bg-slate-900 text-slate-200 hover:border-slate-700"
                   }`}
                 >
                   <button
-                    className="flex-1 text-left"
+                    className="min-w-0 flex-1 truncate text-left"
                     type="button"
                     onClick={() => void handleSelectFolder(folder.id)}
                   >
                     {folder.nombre}
                   </button>
                   <button
-                    className="rounded-xl border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
+                    className="shrink-0 rounded-lg border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
                     type="button"
                     onClick={() => void handleDeleteFolder(folder.id)}
                   >
@@ -358,64 +363,64 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-400">Todavía no hay carpetas creadas.</p>
+              <p className="text-sm leading-6 text-slate-400">Todavía no hay carpetas creadas.</p>
             )}
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-1">
+        <section className={panelClass}>
           <div className="space-y-1">
             <h3 className="text-lg font-semibold text-white">Casos</h3>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm leading-6 text-slate-400">
               Seleccione una carpeta para ver y crear casos asociados.
             </p>
           </div>
 
           <div className="grid gap-3">
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              className={inputClass}
               value={caseTitle}
               onChange={(event) => setCaseTitle(event.target.value)}
               placeholder="Título del caso"
               disabled={!selectedFolderId}
             />
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              className={inputClass}
               value={caseClient}
               onChange={(event) => setCaseClient(event.target.value)}
               placeholder="Cliente (opcional)"
               disabled={!selectedFolderId}
             />
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              className={inputClass}
               value={caseOperacion}
               onChange={(event) => setCaseOperacion(event.target.value)}
-              placeholder="Operación (torneado, fresado, etc.)"
+              placeholder="Operación"
               disabled={!selectedFolderId}
             />
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              className={inputClass}
               value={caseMaterial}
               onChange={(event) => setCaseMaterial(event.target.value)}
               placeholder="Material"
               disabled={!selectedFolderId}
             />
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              className={inputClass}
               value={caseMaquina}
               onChange={(event) => setCaseMaquina(event.target.value)}
               placeholder="Máquina"
               disabled={!selectedFolderId}
             />
             <input
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              className={inputClass}
               value={caseMarca}
               onChange={(event) => setCaseMarca(event.target.value)}
               placeholder="Marca preferida"
               disabled={!selectedFolderId}
             />
             <button
-              className="rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-cyan-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               onClick={() => void handleCreateCase()}
               disabled={!selectedFolderId || loadingCases}
@@ -431,16 +436,16 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               cases.map((caseItem) => (
                 <div
                   key={caseItem.id}
-                  className={`rounded-2xl border p-4 transition ${
+                  className={`rounded-xl border p-3 transition ${
                     selectedCase?.id === caseItem.id
                       ? "border-cyan-400 bg-cyan-400/10"
                       : "border-slate-800 bg-slate-900"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <button className="flex-1 text-left" type="button" onClick={() => void handleSelectCase(caseItem)}>
-                      <p className="text-sm font-medium text-white">{caseItem.titulo}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
+                  <div className="flex items-start gap-3">
+                    <button className="min-w-0 flex-1 text-left" type="button" onClick={() => void handleSelectCase(caseItem)}>
+                      <p className="truncate text-sm font-medium text-white">{caseItem.titulo}</p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
                         {caseItem.estado}
                       </p>
                       {caseItem.cliente ? (
@@ -454,7 +459,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                       ) : null}
                     </button>
                     <button
-                      className="rounded-xl border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
+                      className="shrink-0 rounded-lg border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
                       type="button"
                       onClick={() => void handleDeleteCase(caseItem.id)}
                     >
@@ -464,7 +469,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm leading-6 text-slate-400">
                 {selectedFolderId
                   ? "Esta carpeta todavía no tiene casos."
                   : "Primero seleccione una carpeta."}
@@ -473,10 +478,10 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           </div>
         </section>
 
-        <section className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 md:col-span-2 xl:col-span-1">
+        <section className={panelClass}>
           <div className="space-y-1">
             <h3 className="text-lg font-semibold text-white">Detalle del caso</h3>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm leading-6 text-slate-400">
               {selectedCase
                 ? `Conversación del caso: ${selectedCase.titulo}`
                 : "Seleccione un caso para abrir su conversación."}
@@ -486,7 +491,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           <div className="grid gap-2">
             <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Modo del agente</label>
             <select
-              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-emerald-400"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-50 outline-none transition focus:border-emerald-400"
               value={agentMode}
               onChange={(event) => setAgentMode(event.target.value as AgentMode)}
               disabled={!selectedCase}
@@ -502,14 +507,14 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
 
           <div className="grid gap-3">
             <textarea
-              className="min-h-36 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-emerald-400"
+              className="min-h-32 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-50 outline-none transition focus:border-emerald-400"
               value={chatInput}
               onChange={(event) => setChatInput(event.target.value)}
               placeholder="Escriba el contexto técnico del caso"
               disabled={!selectedCase}
             />
             <button
-              className="rounded-2xl bg-emerald-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-emerald-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               onClick={() => void handleSendMessage()}
               disabled={!selectedCase || loadingMessages}
@@ -525,13 +530,13 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               [...messages].reverse().map((entry) => (
                 <article
                   key={entry.id}
-                  className={`rounded-2xl border p-4 ${
+                  className={`rounded-xl border p-4 ${
                     entry.author === "user"
                       ? "border-emerald-500/30 bg-emerald-500/5"
                       : "border-cyan-500/30 bg-cyan-500/5"
                   }`}
                 >
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                     {entry.author === "user" ? "Usuario" : "Agente"}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
@@ -540,7 +545,7 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                 </article>
               ))
             ) : (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm leading-6 text-slate-400">
                 {selectedCase
                   ? "Este caso todavía no tiene mensajes."
                   : "Primero seleccione un caso."}
