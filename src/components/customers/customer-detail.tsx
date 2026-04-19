@@ -13,6 +13,7 @@ import {
   MODULE_ICON_BG,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
+import { estadoBadge, estadoLabel } from "@/lib/cases/cases";
 
 type CaseRow = {
   id: string;
@@ -159,9 +160,11 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                       {row.titulo}
                     </p>
-                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                      {row.estado}
-                    </p>
+                    <span
+                      className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${estadoBadge(row.estado)}`}
+                    >
+                      {estadoLabel(row.estado)}
+                    </span>
                     {row.operacion ? (
                       <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                         Operación: {row.operacion}

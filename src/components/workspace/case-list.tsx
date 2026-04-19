@@ -3,20 +3,17 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { deleteCase, listCases } from "@/lib/workspace/folders";
-
-type CaseRow = {
-  id: string;
-  folder_id: string;
-  titulo: string;
-  cliente: string | null;
-  operacion: string | null;
-  material: string | null;
-  maquina: string | null;
-  marca_preferida: string | null;
-  estado: string;
-  created_at: string;
-};
+import {
+  deleteCase,
+  listCases,
+  type CaseRow,
+} from "@/lib/workspace/folders";
+import {
+  estadoBadge,
+  estadoLabel,
+  prioridadBadge,
+  prioridadLabel,
+} from "@/lib/cases/cases";
 
 type CaseListProps = {
   folderId: string | null;
@@ -30,7 +27,6 @@ export function CaseList({
   refreshToken = 0,
 }: CaseListProps) {
   const [rows, setRows] = useState<CaseRow[]>([]);
-  const [loading, setLoading] = useState(false);
 
   const notify = useCallback(
     (msg: string | null) => {
@@ -66,7 +62,6 @@ export function CaseList({
   }, [folderId, refreshToken, notify]);
 
   async function handleDelete(id: string) {
-    setLoading(true);
     try {
       const supabase = getSupabaseBrowserClient();
       await deleteCase(supabase, id);
@@ -78,26 +73,20 @@ export function CaseList({
           ? error.message
           : "No se pudo eliminar el caso.",
       );
-    } finally {
-      setLoading(false);
     }
   }
 
   if (!folderId) {
     return (
-      <p className="text-sm leading-6 text-slate-400">
+      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
         Selecciona una carpeta para ver sus casos.
       </p>
     );
   }
 
-  if (loading && !rows.length) {
-    return <p className="text-sm text-slate-400">Cargando casos…</p>;
-  }
-
   if (!rows.length) {
     return (
-      <p className="text-sm leading-6 text-slate-400">
+      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
         Esta carpeta todavía no tiene casos.
       </p>
     );
@@ -108,39 +97,51 @@ export function CaseList({
       {rows.map((row) => (
         <div
           key={row.id}
-          className="rounded-xl border border-slate-800 bg-slate-900 p-3 transition hover:border-cyan-400/40"
+          className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-5 shadow-sm transition duration-150 hover:border-emerald-500/50 hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-emerald-400/50 dark:hover:bg-slate-900/70 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-emerald-500/70 dark:before:bg-emerald-400/70"
         >
           <div className="flex items-start gap-3">
             <Link
               href={`/app/caso/${row.id}`}
               className="min-w-0 flex-1 text-left"
             >
-              <p className="truncate text-sm font-medium text-white">
+              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                 {row.titulo}
               </p>
-              <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                {row.estado}
-              </p>
-              {row.cliente ? (
-                <p className="mt-2 text-sm text-slate-300">
-                  Cliente: {row.cliente}
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${estadoBadge(row.estado)}`}
+                >
+                  {estadoLabel(row.estado)}
+                </span>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${prioridadBadge(row.prioridad)}`}
+                >
+                  {prioridadLabel(row.prioridad)}
+                </span>
+              </div>
+
+              {row.siguiente_accion ? (
+                <p className="mt-2 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">
+                    Siguiente:
+                  </span>{" "}
+                  {row.siguiente_accion}
                 </p>
               ) : null}
-              {row.operacion ? (
-                <p className="mt-1 text-sm text-slate-400">
-                  Operación: {row.operacion}
-                </p>
-              ) : null}
-              {row.material ? (
-                <p className="mt-1 text-sm text-slate-400">
-                  Material: {row.material}
+
+              {row.cliente || row.operacion || row.material ? (
+                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  {[row.cliente, row.operacion, row.material]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               ) : null}
             </Link>
             <button
               type="button"
               onClick={() => void handleDelete(row.id)}
-              className="shrink-0 rounded-lg border border-rose-700 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-900/30"
+              className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
             >
               Borrar
             </button>

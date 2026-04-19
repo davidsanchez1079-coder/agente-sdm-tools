@@ -2,22 +2,10 @@
 
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { createCase } from "@/lib/workspace/folders";
+import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import { CUSTOMERS } from "@/lib/customers/customers";
-
-type CaseRow = {
-  id: string;
-  folder_id: string;
-  titulo: string;
-  cliente: string | null;
-  operacion: string | null;
-  material: string | null;
-  maquina: string | null;
-  marca_preferida: string | null;
-  estado: string;
-  created_at: string;
-};
+import { CASE_PRIORIDADES, type CasePrioridad } from "@/lib/cases/cases";
 
 type CaseFormProps = {
   folderId: string | null;
@@ -34,6 +22,7 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   const [material, setMaterial] = useState("");
   const [maquina, setMaquina] = useState("");
   const [marca, setMarca] = useState<BrandId | "">("");
+  const [prioridad, setPrioridad] = useState<CasePrioridad>("media");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit() {
@@ -42,16 +31,15 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
     onMessage?.(null);
     try {
       const supabase = getSupabaseBrowserClient();
-      const row = await createCase(
-        supabase,
-        folderId,
-        titulo.trim(),
-        cliente.trim() || undefined,
-        operacion.trim() || undefined,
-        material.trim() || undefined,
-        maquina.trim() || undefined,
-        marca.trim() || undefined,
-      );
+      const row = await createCase(supabase, folderId, {
+        titulo: titulo.trim(),
+        cliente: cliente.trim() || undefined,
+        operacion: operacion.trim() || undefined,
+        material: material.trim() || undefined,
+        maquina: maquina.trim() || undefined,
+        marcaPreferida: marca.trim() || undefined,
+        prioridad,
+      });
       onCreated(row);
       setTitulo("");
       setCliente("");
@@ -59,6 +47,7 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
       setMaterial("");
       setMaquina("");
       setMarca("");
+      setPrioridad("media");
       onMessage?.("Caso creado.");
     } catch (error) {
       onMessage?.(
@@ -72,7 +61,7 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   }
 
   const controlClass =
-    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-cyan-400";
+    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-cyan-400 dark:focus:ring-cyan-400/20";
 
   return (
     <div className="grid gap-3">
@@ -136,11 +125,24 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
         ))}
       </select>
 
+      <select
+        className={controlClass}
+        value={prioridad}
+        onChange={(event) => setPrioridad(event.target.value as CasePrioridad)}
+        disabled={!folderId}
+      >
+        {CASE_PRIORIDADES.map((row) => (
+          <option key={row.id} value={row.id}>
+            Prioridad: {row.label}
+          </option>
+        ))}
+      </select>
+
       <button
         type="button"
         onClick={() => void handleSubmit()}
         disabled={!folderId || saving || !titulo.trim()}
-        className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:hover:bg-cyan-300"
+        className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-cyan-300"
       >
         {saving ? "Creando…" : "Crear caso"}
       </button>

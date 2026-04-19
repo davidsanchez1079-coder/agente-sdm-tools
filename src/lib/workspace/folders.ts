@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CaseEstado, CasePrioridad } from "@/lib/cases/cases";
 
 type FolderRow = {
   id: string;
@@ -8,7 +9,7 @@ type FolderRow = {
   created_at: string;
 };
 
-type CaseRow = {
+export type CaseRow = {
   id: string;
   folder_id: string;
   titulo: string;
@@ -17,9 +18,15 @@ type CaseRow = {
   material: string | null;
   maquina: string | null;
   marca_preferida: string | null;
-  estado: string;
+  estado: CaseEstado;
+  prioridad: CasePrioridad;
+  siguiente_accion: string | null;
+  resumen_ejecutivo: string | null;
   created_at: string;
 };
+
+const CASE_COLUMNS =
+  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, created_at";
 
 export async function listFolders(supabase: SupabaseClient, workspaceId: string) {
   const { data, error } = await supabase
@@ -61,9 +68,7 @@ export async function deleteFolder(supabase: SupabaseClient, folderId: string) {
 export async function listCases(supabase: SupabaseClient, folderId: string) {
   const { data, error } = await supabase
     .from("cases")
-    .select(
-      "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, created_at",
-    )
+    .select(CASE_COLUMNS)
     .eq("folder_id", folderId)
     .order("created_at", { ascending: false })
     .returns<CaseRow[]>();
@@ -72,31 +77,58 @@ export async function listCases(supabase: SupabaseClient, folderId: string) {
   return data;
 }
 
+export type CreateCaseInput = {
+  titulo: string;
+  cliente?: string;
+  operacion?: string;
+  material?: string;
+  maquina?: string;
+  marcaPreferida?: string;
+  prioridad?: CasePrioridad;
+};
+
 export async function createCase(
   supabase: SupabaseClient,
   folderId: string,
-  titulo: string,
-  cliente?: string,
-  operacion?: string,
-  material?: string,
-  maquina?: string,
-  marcaPreferida?: string,
+  input: CreateCaseInput,
 ) {
   const { data, error } = await supabase
     .from("cases")
     .insert({
       folder_id: folderId,
-      titulo,
-      cliente: cliente || null,
-      operacion: operacion || null,
-      material: material || null,
-      maquina: maquina || null,
-      marca_preferida: marcaPreferida || null,
+      titulo: input.titulo,
+      cliente: input.cliente || null,
+      operacion: input.operacion || null,
+      material: input.material || null,
+      maquina: input.maquina || null,
+      marca_preferida: input.marcaPreferida || null,
       estado: "abierto",
+      prioridad: input.prioridad ?? "media",
     })
-    .select(
-      "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, created_at",
-    )
+    .select(CASE_COLUMNS)
+    .single<CaseRow>();
+
+  if (error) throw error;
+  return data;
+}
+
+export type UpdateCasePatch = Partial<{
+  estado: CaseEstado;
+  prioridad: CasePrioridad;
+  siguiente_accion: string | null;
+  resumen_ejecutivo: string | null;
+}>;
+
+export async function updateCase(
+  supabase: SupabaseClient,
+  caseId: string,
+  patch: UpdateCasePatch,
+) {
+  const { data, error } = await supabase
+    .from("cases")
+    .update(patch)
+    .eq("id", caseId)
+    .select(CASE_COLUMNS)
     .single<CaseRow>();
 
   if (error) throw error;

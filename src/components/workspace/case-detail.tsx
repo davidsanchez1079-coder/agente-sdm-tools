@@ -4,9 +4,20 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createMessage, listMessages } from "@/lib/workspace/messages";
+import { updateCase, type CaseRow } from "@/lib/workspace/folders";
 import { buildGeneralAgentResponse } from "@/lib/agent/general-response";
 import { buildSpecialistAgentResponse } from "@/lib/agent/specialist-response";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
+import {
+  CASE_ESTADOS,
+  CASE_PRIORIDADES,
+  estadoBadge,
+  estadoLabel,
+  prioridadBadge,
+  prioridadLabel,
+  type CaseEstado,
+  type CasePrioridad,
+} from "@/lib/cases/cases";
 import {
   MODULE_BAR,
   MODULE_CHIP,
@@ -14,19 +25,6 @@ import {
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
 import { AgentModeSelect } from "./agent-mode-select";
-
-type CaseRow = {
-  id: string;
-  folder_id: string;
-  titulo: string;
-  cliente: string | null;
-  operacion: string | null;
-  material: string | null;
-  maquina: string | null;
-  marca_preferida: string | null;
-  estado: string;
-  created_at: string;
-};
 
 type MessageRow = {
   id: string;
@@ -61,6 +59,9 @@ function describeFabricante(marcaPreferida: string | null) {
   return match?.label ?? marcaPreferida;
 }
 
+const CASE_COLUMNS =
+  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, created_at";
+
 export function CaseDetail({ caseId }: CaseDetailProps) {
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -71,6 +72,13 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
+  const [resumenDraft, setResumenDraft] = useState("");
+  const [siguienteDraft, setSiguienteDraft] = useState("");
+  const [savingResumen, setSavingResumen] = useState(false);
+  const [savingSiguiente, setSavingSiguiente] = useState(false);
+  const [savingEstado, setSavingEstado] = useState(false);
+  const [savingPrioridad, setSavingPrioridad] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -78,9 +86,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         const supabase = getSupabaseBrowserClient();
         const { data: caseData, error: caseError } = await supabase
           .from("cases")
-          .select(
-            "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, created_at",
-          )
+          .select(CASE_COLUMNS)
           .eq("id", caseId)
           .maybeSingle<CaseRow>();
 
@@ -91,6 +97,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           return;
         }
         setCaseItem(caseData);
+        setResumenDraft(caseData.resumen_ejecutivo ?? "");
+        setSiguienteDraft(caseData.siguiente_accion ?? "");
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
 
         const msgs = await listMessages(supabase, caseId);
@@ -111,6 +119,90 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       cancelled = true;
     };
   }, [caseId]);
+
+  async function handleSaveResumen() {
+    if (!caseItem) return;
+    setSavingResumen(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        resumen_ejecutivo: resumenDraft.trim() || null,
+      });
+      setCaseItem(updated);
+      setMessage("Resumen ejecutivo guardado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar el resumen.",
+      );
+    } finally {
+      setSavingResumen(false);
+    }
+  }
+
+  async function handleSaveSiguiente() {
+    if (!caseItem) return;
+    setSavingSiguiente(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        siguiente_accion: siguienteDraft.trim() || null,
+      });
+      setCaseItem(updated);
+      setMessage("Siguiente acción guardada.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar la siguiente acción.",
+      );
+    } finally {
+      setSavingSiguiente(false);
+    }
+  }
+
+  async function handleChangeEstado(estado: CaseEstado) {
+    if (!caseItem || caseItem.estado === estado) return;
+    setSavingEstado(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, { estado });
+      setCaseItem(updated);
+      setMessage("Estado actualizado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el estado.",
+      );
+    } finally {
+      setSavingEstado(false);
+    }
+  }
+
+  async function handleChangePrioridad(prioridad: CasePrioridad) {
+    if (!caseItem || caseItem.prioridad === prioridad) return;
+    setSavingPrioridad(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, { prioridad });
+      setCaseItem(updated);
+      setMessage("Prioridad actualizada.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar la prioridad.",
+      );
+    } finally {
+      setSavingPrioridad(false);
+    }
+  }
 
   async function handleSend() {
     if (!caseItem || !chatInput.trim()) return;
@@ -209,6 +301,19 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   if (!caseItem) return null;
 
   const fabricanteLabel = describeFabricante(caseItem.marca_preferida);
+  const resumenDirty =
+    (caseItem.resumen_ejecutivo ?? "") !== resumenDraft.trim() &&
+    resumenDraft.trim() !== "";
+  const resumenErased =
+    (caseItem.resumen_ejecutivo ?? "") !== "" && resumenDraft.trim() === "";
+  const siguienteDirty =
+    (caseItem.siguiente_accion ?? "") !== siguienteDraft.trim() &&
+    siguienteDraft.trim() !== "";
+  const siguienteErased =
+    (caseItem.siguiente_accion ?? "") !== "" && siguienteDraft.trim() === "";
+
+  const controlClass =
+    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20";
 
   return (
     <section className="grid min-w-0 gap-6">
@@ -230,32 +335,164 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             {caseItem.titulo}
           </h2>
-          <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-            {caseItem.estado}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${MODULE_CHIP.caso}`}
+          >
+            Caso
+          </span>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${estadoBadge(caseItem.estado)}`}
+          >
+            {estadoLabel(caseItem.estado)}
+          </span>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${prioridadBadge(caseItem.prioridad)}`}
+          >
+            Prioridad {prioridadLabel(caseItem.prioridad)}
           </span>
         </div>
-        <span
-          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${MODULE_CHIP.caso}`}
-        >
-          Caso
-        </span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <InfoTile label="Fabricante" value={fabricanteLabel} />
-        {caseItem.cliente ? (
-          <InfoTile label="Cliente" value={caseItem.cliente} />
-        ) : null}
-        {caseItem.operacion ? (
-          <InfoTile label="Operación" value={caseItem.operacion} />
-        ) : null}
-        {caseItem.material ? (
-          <InfoTile label="Material" value={caseItem.material} />
-        ) : null}
-        {caseItem.maquina ? (
-          <InfoTile label="Máquina" value={caseItem.maquina} />
-        ) : null}
+      <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Estado
+            </span>
+            <select
+              className={controlClass}
+              value={caseItem.estado}
+              onChange={(event) =>
+                void handleChangeEstado(event.target.value as CaseEstado)
+              }
+              disabled={savingEstado}
+            >
+              {CASE_ESTADOS.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Prioridad
+            </span>
+            <select
+              className={controlClass}
+              value={caseItem.prioridad}
+              onChange={(event) =>
+                void handleChangePrioridad(
+                  event.target.value as CasePrioridad,
+                )
+              }
+              disabled={savingPrioridad}
+            >
+              {CASE_PRIORIDADES.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
+
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Siguiente acción
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Qué toca hacer después. Corto y concreto.
+          </p>
+        </div>
+        <input
+          className={controlClass}
+          value={siguienteDraft}
+          onChange={(event) => setSiguienteDraft(event.target.value)}
+          placeholder="Ej. Confirmar vida del inserto con operador el viernes."
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSaveSiguiente()}
+            disabled={
+              savingSiguiente || (!siguienteDirty && !siguienteErased)
+            }
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
+          >
+            {savingSiguiente ? "Guardando…" : "Guardar"}
+          </button>
+          {siguienteDirty || siguienteErased ? (
+            <span className="text-xs text-amber-600 dark:text-amber-300">
+              Sin guardar
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Resumen ejecutivo
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Tres o cuatro líneas con lo esencial del caso.
+          </p>
+        </div>
+        <textarea
+          className={`${controlClass} min-h-24`}
+          value={resumenDraft}
+          onChange={(event) => setResumenDraft(event.target.value)}
+          placeholder="Qué pasa, qué se probó y qué se recomienda."
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSaveResumen()}
+            disabled={savingResumen || (!resumenDirty && !resumenErased)}
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
+          >
+            {savingResumen ? "Guardando…" : "Guardar"}
+          </button>
+          {resumenDirty || resumenErased ? (
+            <span className="text-xs text-amber-600 dark:text-amber-300">
+              Sin guardar
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="grid gap-3">
+        <header>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Contexto técnico
+          </h3>
+        </header>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <InfoTile label="Fabricante" value={fabricanteLabel} />
+          <InfoTile
+            label="Cliente"
+            value={caseItem.cliente ?? "Sin asignar"}
+          />
+          <InfoTile
+            label="Operación"
+            value={caseItem.operacion ?? "Sin asignar"}
+          />
+          <InfoTile
+            label="Material"
+            value={caseItem.material ?? "Sin asignar"}
+          />
+          <InfoTile
+            label="Máquina"
+            value={caseItem.maquina ?? "Sin asignar"}
+          />
+        </div>
+      </section>
 
       <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <AgentModeSelect
@@ -265,7 +502,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         />
         <div className="grid gap-3">
           <textarea
-            className="min-h-32 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
+            className={`${controlClass} min-h-32`}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             placeholder="Escribe el contexto técnico del caso"
