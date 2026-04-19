@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, createFolder, listCases, listFolders } from "@/lib/workspace/folders";
 import { createMessage, listMessages } from "@/lib/workspace/messages";
+import { buildGeneralAgentResponse } from "@/lib/agent/general-response";
 
 type WorkspaceShellProps = {
   userName: string;
@@ -157,7 +158,11 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
         supabase,
         selectedCase.id,
         "agent",
-        `Recibí su mensaje sobre el caso \"${selectedCase.titulo}\". El siguiente bloque conectará el agente técnico real.`,
+        buildGeneralAgentResponse({
+          caseTitle: selectedCase.titulo,
+          client: selectedCase.cliente,
+          message: chatInput.trim(),
+        }),
       );
 
       setMessages((prev) => [...prev, userMessage, agentMessage]);
