@@ -19,7 +19,6 @@ type SpecialistAgentInput = {
 
 type BrandRule = {
   label: string;
-  focus: string;
   recommendation: string;
   caution: string;
   nextStep: string;
@@ -28,55 +27,59 @@ type BrandRule = {
 const BRAND_RULES: Record<Exclude<SpecialistMode, "general">, BrandRule> = {
   sandvik: {
     label: "Sandvik Coromant",
-    focus: "aplicación estable en torneado, fresado y barrenado de alto desempeño",
     recommendation:
-      "para una prueba inicial conviene priorizar una geometría estable, control de filo y consistencia de acabado antes de subir agresividad",
+      "yo priorizaría una prueba estable con geometría y grado orientados a control real del corte antes de perseguir agresividad",
     caution:
-      "si todavía no están cerrados el grado, la geometría exacta o la condición de máquina, conviene validar con una corrida conservadora y documentar resultado",
+      "si grado, geometría o condición de máquina no están bien amarrados, conviene validar con una corrida conservadora",
     nextStep:
-      "definir familia de solución, objetivo de corte y rango inicial de parámetros dentro del enfoque Sandvik",
+      "definir familia de solución y rango inicial de parámetros dentro del enfoque Sandvik",
   },
   vargus: {
     label: "Vargus",
-    focus: "roscado, ranurado y herramientas especializadas donde manda la geometría de aplicación",
     recommendation:
-      "lo primero es amarrar estándar, perfil y condición de entrada para no recomendar una solución equivocada por detalle de rosca o forma",
+      "primero cerraría estándar, perfil y condición de aplicación para no recomendar una solución equivocada por detalle de rosca o forma",
     caution:
-      "si falta paso, perfil, diámetro o si la aplicación es interna o externa, cualquier recomendación cerrada sería prematura",
+      "si falta paso, perfil, diámetro o si la aplicación es interna o externa, todavía no conviene cerrar la propuesta",
     nextStep:
-      "confirmar estándar de rosca, perfil, paso, diámetro y tipo de aplicación para aterrizar la recomendación",
+      "confirmar estándar, perfil, paso, diámetro y tipo de aplicación",
   },
   korloy: {
     label: "Korloy",
-    focus: "productividad con buena relación costo-rendimiento en torneado y fresado",
     recommendation:
-      "conviene buscar una solución estable y competitiva en costo por pieza, sin arrancar demasiado agresivo hasta validar comportamiento real",
+      "buscaría una salida estable y rentable en costo por pieza, sin arrancar demasiado agresivo hasta validar comportamiento real",
     caution:
-      "si la prioridad es vida de herramienta, costo por pieza o disponibilidad inmediata, hay que decirlo explícitamente porque cambia la recomendación",
+      "si la prioridad es vida, costo o disponibilidad inmediata, hay que definirlo porque cambia la salida",
     nextStep:
-      "definir si la prioridad es costo, vida, agresividad de corte o disponibilidad para aterrizar mejor la solución",
+      "definir si la prioridad es costo, vida, agresividad o disponibilidad",
   },
   dormer: {
     label: "Dormer Pramet",
-    focus: "aplicación práctica de herramientas estándar en barrenado, fresado y torneado",
     recommendation:
-      "para avanzar bien aquí conviene aterrizar primero herramienta, diámetro útil y condición de máquina antes de cerrar una propuesta de trabajo",
+      "aterrizaría primero herramienta, diámetro útil y condición de máquina antes de cerrar una propuesta más fina",
     caution:
-      "si falta profundidad, longitud útil o rigidez de montaje, el riesgo es recomendar algo correcto en papel pero flojo en campo",
+      "si falta profundidad útil o rigidez de montaje, se corre el riesgo de recomendar algo correcto en papel pero flojo en campo",
     nextStep:
-      "confirmar herramienta, diámetro, profundidad útil y condición de máquina para bajar la recomendación",
+      "confirmar herramienta, diámetro, profundidad útil y condición de máquina",
   },
   boehlerit: {
     label: "Boehlerit",
-    focus: "mecanizado robusto con atención a estabilidad, materiales demandantes y consistencia de proceso",
     recommendation:
-      "la mejor salida inicial suele ser una propuesta conservadora y muy estable antes de perseguir productividad máxima",
+      "me iría por una salida conservadora y muy estable antes de buscar productividad máxima",
     caution:
-      "si el montaje, la rigidez o el material no están bien confirmados, se puede castigar la prueba aunque el grado sea correcto",
+      "si montaje, rigidez o material no están bien confirmados, se puede castigar la prueba aunque el grado sea correcto",
     nextStep:
-      "confirmar material, estabilidad de montaje y meta de productividad para aterrizar la solución",
+      "confirmar material, estabilidad de montaje y meta de productividad",
   },
 };
+
+function detectNeed(text: string) {
+  const lower = text.toLowerCase();
+  if (lower.includes("rebaba")) return "control de rebaba";
+  if (lower.includes("acabado")) return "acabado superficial";
+  if (lower.includes("desgaste")) return "control de desgaste";
+  if (lower.includes("inserto")) return "definición de inserto";
+  return "ajuste técnico de aplicación";
+}
 
 export function buildSpecialistAgentResponse({
   caseTitle,
@@ -86,6 +89,7 @@ export function buildSpecialistAgentResponse({
   material,
   maquina,
   marcaPreferida,
+  history = [],
   mode,
 }: SpecialistAgentInput) {
   if (mode === "general") {
@@ -93,15 +97,23 @@ export function buildSpecialistAgentResponse({
   }
 
   const rule = BRAND_RULES[mode];
+  const need = detectNeed(message);
+  const intro = history.length
+    ? `Tomando el contexto ya confirmado en \"${caseTitle}\"${client ? ` con ${client}` : ""}.`
+    : `Lectura inicial del caso \"${caseTitle}\"${client ? ` con ${client}` : ""}.`;
+
+  const focusedAnswer =
+    need === "control de rebaba"
+      ? `Si la prioridad es rebaba en ${operacion || "la operación"}, dentro del enfoque ${rule.label} yo revisaría primero geometría efectiva, filo y avance real antes de mover velocidad sin control.`
+      : `Para ${operacion || "esta operación"} sobre ${material || "este material"}, dentro del enfoque ${rule.label}, ${rule.recommendation}.`;
 
   return [
-    `Lectura del caso: para \"${caseTitle}\"${client ? ` con ${client}` : ""}, estamos viendo ${operacion || "una operación por confirmar"} sobre ${material || "material por confirmar"}${maquina ? ` en ${maquina}` : ""}.`,
-    marcaPreferida ? `Marca objetivo registrada: ${marcaPreferida}.` : null,
-    `En enfoque ${rule.label}, aquí priorizaría ${rule.focus}.`,
-    `Recomendación inicial: ${rule.recommendation}.`,
-    `Con su mensaje (\"${message}\"), mi lectura es que primero conviene validar una prueba controlada y medir resultado antes de mover el set-up a un rango más agresivo.`,
+    intro,
+    focusedAnswer,
+    maquina ? `Máquina considerada: ${maquina}.` : null,
+    marcaPreferida ? `Marca objetivo: ${marcaPreferida}.` : null,
     `Punto de cuidado: ${rule.caution}.`,
-    `Siguiente dato para afinar: ${rule.nextStep}.`,
+    `Siguiente dato puntual para afinar: ${rule.nextStep}.`,
   ]
     .filter(Boolean)
     .join("\n\n");
