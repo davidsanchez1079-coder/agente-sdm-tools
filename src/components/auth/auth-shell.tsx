@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
 
@@ -13,10 +14,19 @@ export function AuthShell() {
     () => (isConfigured ? getSupabaseBrowserClient() : null),
     [isConfigured],
   );
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<"signin" | "signup" | null>(null);
+
+  const authStatus = searchParams.get("auth");
+  const callbackMessage =
+    authStatus === "confirmed"
+      ? "Correo confirmado correctamente. Ya puede iniciar sesión."
+      : authStatus === "missing-code"
+        ? "El enlace de confirmación llegó incompleto. Pida uno nuevo."
+        : null;
 
   async function handleAuth(mode: "signin" | "signup") {
     if (!supabase) {
@@ -29,7 +39,13 @@ export function AuthShell() {
 
     const response =
       mode === "signup"
-        ? await supabase.auth.signUp({ email, password })
+        ? await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+          })
         : await supabase.auth.signInWithPassword({ email, password });
 
     if (response.error) {
@@ -111,9 +127,9 @@ export function AuthShell() {
         </div>
       </form>
 
-      {message ? (
+      {message || callbackMessage ? (
         <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
-          {message}
+          {message ?? callbackMessage}
         </div>
       ) : null}
     </section>

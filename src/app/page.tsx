@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthShell } from "@/components/auth/auth-shell";
 
 const fases = [
@@ -38,7 +39,15 @@ export default function Home() {
             </div>
           </div>
 
-          <AuthShell />
+          <Suspense
+            fallback={
+              <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 text-sm text-slate-300">
+                Cargando acceso...
+              </div>
+            }
+          >
+            <AuthShell />
+          </Suspense>
         </div>
       </section>
     </main>
