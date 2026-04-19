@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { BrandId } from "@/lib/brands/brands";
 
 type MessageRow = {
   id: string;
   case_id: string;
   author: "user" | "agent";
   content: string;
-  mode_used: "general" | "sandvik" | "vargus" | "korloy" | "dormer" | "boehlerit";
+  mode_used: BrandId;
   created_at: string;
 };
 

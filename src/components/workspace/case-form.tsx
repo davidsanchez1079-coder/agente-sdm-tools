@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase } from "@/lib/workspace/folders";
+import { BRANDS, type BrandId } from "@/lib/brands/brands";
+import { CUSTOMERS } from "@/lib/customers/customers";
 
 type CaseRow = {
   id: string;
@@ -23,13 +25,15 @@ type CaseFormProps = {
   onMessage?: (message: string | null) => void;
 };
 
+const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
+
 export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   const [titulo, setTitulo] = useState("");
   const [cliente, setCliente] = useState("");
   const [operacion, setOperacion] = useState("");
   const [material, setMaterial] = useState("");
   const [maquina, setMaquina] = useState("");
-  const [marca, setMarca] = useState("");
+  const [marca, setMarca] = useState<BrandId | "">("");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit() {
@@ -67,58 +71,76 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
     }
   }
 
-  const inputClass =
-    "w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-50 outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-60";
+  const controlClass =
+    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-cyan-400";
 
   return (
     <div className="grid gap-3">
       <input
-        className={inputClass}
+        className={controlClass}
         value={titulo}
         onChange={(event) => setTitulo(event.target.value)}
         placeholder="Título del caso"
         disabled={!folderId}
       />
-      <input
-        className={inputClass}
+
+      <select
+        className={controlClass}
         value={cliente}
         onChange={(event) => setCliente(event.target.value)}
-        placeholder="Cliente (opcional)"
         disabled={!folderId}
-      />
+      >
+        <option value="">Sin cliente</option>
+        {CUSTOMERS.map((customer) => (
+          <option key={customer.id} value={customer.label}>
+            {customer.label}
+          </option>
+        ))}
+      </select>
+
       <input
-        className={inputClass}
+        className={controlClass}
         value={operacion}
         onChange={(event) => setOperacion(event.target.value)}
         placeholder="Operación"
         disabled={!folderId}
       />
       <input
-        className={inputClass}
+        className={controlClass}
         value={material}
         onChange={(event) => setMaterial(event.target.value)}
         placeholder="Material"
         disabled={!folderId}
       />
       <input
-        className={inputClass}
+        className={controlClass}
         value={maquina}
         onChange={(event) => setMaquina(event.target.value)}
         placeholder="Máquina"
         disabled={!folderId}
       />
-      <input
-        className={inputClass}
+
+      <select
+        className={controlClass}
         value={marca}
-        onChange={(event) => setMarca(event.target.value)}
-        placeholder="Marca preferida"
+        onChange={(event) =>
+          setMarca(event.target.value as BrandId | "")
+        }
         disabled={!folderId}
-      />
+      >
+        <option value="">Sin fabricante</option>
+        {FABRICANTES.map((brand) => (
+          <option key={brand.id} value={brand.id}>
+            {brand.label}
+          </option>
+        ))}
+      </select>
+
       <button
         type="button"
         onClick={() => void handleSubmit()}
         disabled={!folderId || saving || !titulo.trim()}
-        className="rounded-xl bg-cyan-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:hover:bg-cyan-300"
       >
         {saving ? "Creando…" : "Crear caso"}
       </button>

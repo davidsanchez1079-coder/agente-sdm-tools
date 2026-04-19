@@ -3,7 +3,7 @@ type MessageContext = {
   content: string;
 };
 
-type SpecialistMode = "general" | "sandvik" | "vargus" | "korloy" | "dormer" | "boehlerit";
+type SpecialistMode = "general" | "sandvik" | "vargus" | "korloy" | "dormer" | "amec";
 
 type SpecialistAgentInput = {
   caseTitle: string;
@@ -61,14 +61,14 @@ const BRAND_RULES: Record<Exclude<SpecialistMode, "general">, BrandRule> = {
     nextStep:
       "confirmar herramienta, diámetro, profundidad útil y condición de máquina",
   },
-  boehlerit: {
-    label: "Boehlerit",
+  amec: {
+    label: "Amec",
     recommendation:
-      "me iría por una salida conservadora y muy estable antes de buscar productividad máxima",
+      "aterrizaría primero diámetro, profundidad útil y material antes de decidir entre cabeza modular o broca entera, para que la solución Amec entre bien de arranque",
     caution:
-      "si montaje, rigidez o material no están bien confirmados, se puede castigar la prueba aunque el grado sea correcto",
+      "si no están confirmados diámetro, profundidad útil, material o condición de fluido, se puede recomendar una cabeza modular que no aplica o un entero donde ya pedía modular",
     nextStep:
-      "confirmar material, estabilidad de montaje y meta de productividad",
+      "confirmar diámetro, profundidad útil, material y condición de fluido para decidir modular vs entero",
   },
 };
 
