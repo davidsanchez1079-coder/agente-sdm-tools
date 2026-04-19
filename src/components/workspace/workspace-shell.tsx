@@ -25,6 +25,10 @@ type CaseItem = {
   folder_id: string;
   titulo: string;
   cliente: string | null;
+  operacion: string | null;
+  material: string | null;
+  maquina: string | null;
+  marca_preferida: string | null;
   estado: string;
   created_at: string;
 };
@@ -38,6 +42,10 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
   const [folderName, setFolderName] = useState("");
   const [caseTitle, setCaseTitle] = useState("");
   const [caseClient, setCaseClient] = useState("");
+  const [caseOperacion, setCaseOperacion] = useState("");
+  const [caseMaterial, setCaseMaterial] = useState("");
+  const [caseMaquina, setCaseMaquina] = useState("");
+  const [caseMarca, setCaseMarca] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState<
     {
@@ -116,10 +124,18 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
         selectedFolderId,
         caseTitle.trim(),
         caseClient.trim() || undefined,
+        caseOperacion.trim() || undefined,
+        caseMaterial.trim() || undefined,
+        caseMaquina.trim() || undefined,
+        caseMarca.trim() || undefined,
       );
       setCases((prev) => [row, ...prev]);
       setCaseTitle("");
       setCaseClient("");
+      setCaseOperacion("");
+      setCaseMaterial("");
+      setCaseMaquina("");
+      setCaseMarca("");
       setMessage("Caso creado correctamente.");
     } catch (error) {
       const detail = error instanceof Error ? error.message : "No se pudo crear el caso.";
@@ -162,6 +178,10 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
           caseTitle: selectedCase.titulo,
           client: selectedCase.cliente,
           message: chatInput.trim(),
+          operacion: selectedCase.operacion,
+          material: selectedCase.material,
+          maquina: selectedCase.maquina,
+          marcaPreferida: selectedCase.marca_preferida,
         }),
       );
 
@@ -276,6 +296,34 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
               placeholder="Cliente (opcional)"
               disabled={!selectedFolderId}
             />
+            <input
+              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              value={caseOperacion}
+              onChange={(event) => setCaseOperacion(event.target.value)}
+              placeholder="Operación (torneado, fresado, etc.)"
+              disabled={!selectedFolderId}
+            />
+            <input
+              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              value={caseMaterial}
+              onChange={(event) => setCaseMaterial(event.target.value)}
+              placeholder="Material"
+              disabled={!selectedFolderId}
+            />
+            <input
+              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              value={caseMaquina}
+              onChange={(event) => setCaseMaquina(event.target.value)}
+              placeholder="Máquina"
+              disabled={!selectedFolderId}
+            />
+            <input
+              className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-cyan-400"
+              value={caseMarca}
+              onChange={(event) => setCaseMarca(event.target.value)}
+              placeholder="Marca preferida"
+              disabled={!selectedFolderId}
+            />
             <button
               className="rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
@@ -307,6 +355,12 @@ export function WorkspaceShell({ userName, email, workspaceId }: WorkspaceShellP
                   </p>
                   {caseItem.cliente ? (
                     <p className="mt-2 text-sm text-slate-300">Cliente: {caseItem.cliente}</p>
+                  ) : null}
+                  {caseItem.operacion ? (
+                    <p className="mt-1 text-sm text-slate-400">Operación: {caseItem.operacion}</p>
+                  ) : null}
+                  {caseItem.material ? (
+                    <p className="mt-1 text-sm text-slate-400">Material: {caseItem.material}</p>
                   ) : null}
                 </button>
               ))

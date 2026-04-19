@@ -2,6 +2,10 @@ type GeneralAgentInput = {
   caseTitle: string;
   client?: string | null;
   message: string;
+  operacion?: string | null;
+  material?: string | null;
+  maquina?: string | null;
+  marcaPreferida?: string | null;
 };
 
 function detectOperacion(text: string) {
@@ -32,15 +36,32 @@ function detectNeed(text: string) {
   return "diagnóstico técnico inicial";
 }
 
-export function buildGeneralAgentResponse({ caseTitle, client, message }: GeneralAgentInput) {
-  const operacion = detectOperacion(message);
-  const material = detectMaterial(message);
+export function buildGeneralAgentResponse({
+  caseTitle,
+  client,
+  message,
+  operacion,
+  material,
+  maquina,
+  marcaPreferida,
+}: GeneralAgentInput) {
+  const detectedOperacion = operacion || detectOperacion(message);
+  const detectedMaterial = material || detectMaterial(message);
   const need = detectNeed(message);
 
+  const contexto = [
+    `Contexto técnico: para el caso \"${caseTitle}\"${client ? ` con ${client}` : ""}, detecto una consulta de ${detectedOperacion} sobre ${detectedMaterial}.`,
+    maquina ? `Máquina reportada: ${maquina}.` : null,
+    marcaPreferida ? `Marca preferida declarada: ${marcaPreferida}.` : null,
+    `La necesidad principal parece ser ${need}.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return [
-    `Contexto técnico: para el caso \"${caseTitle}\"${client ? ` con ${client}` : ""}, detecto una consulta de ${operacion} sobre ${material}. La necesidad principal parece ser ${need}.`,
+    contexto,
     "Recomendación inicial: arranque con una prueba conservadora, priorizando estabilidad de corte, control de viruta y revisión de rigidez de sujeción antes de subir parámetros.",
-    "Parámetros de arranque sugeridos: use velocidad media, avance moderado y profundidad ligera en la primera corrida. Si la prueba es de torneado en acero 1040, empiece estable y suba solo si la máquina, la sujeción y el filo responden bien.",
-    "Siguiente dato que necesito para afinar: operación exacta, diámetro o herramienta, tipo de inserto/herramental, máquina y objetivo (desbaste, acabado, vida, tiempo ciclo o problema puntual).",
+    `Parámetros de arranque sugeridos: para ${detectedOperacion}, use velocidad media, avance moderado y profundidad ligera en la primera corrida. Si observa estabilidad, suba un parámetro a la vez y documente el cambio.`,
+    "Siguiente dato que necesito para afinar: diámetro o herramienta exacta, tipo de inserto/herramental, condición actual del filo, sistema de sujeción y objetivo principal (desbaste, acabado, vida, tiempo ciclo o problema puntual).",
   ].join("\n\n");
 }

@@ -13,6 +13,10 @@ type CaseRow = {
   folder_id: string;
   titulo: string;
   cliente: string | null;
+  operacion: string | null;
+  material: string | null;
+  maquina: string | null;
+  marca_preferida: string | null;
   estado: string;
   created_at: string;
 };
@@ -52,7 +56,9 @@ export async function createFolder(
 export async function listCases(supabase: SupabaseClient, folderId: string) {
   const { data, error } = await supabase
     .from("cases")
-    .select("id, folder_id, titulo, cliente, estado, created_at")
+    .select(
+      "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, created_at",
+    )
     .eq("folder_id", folderId)
     .order("created_at", { ascending: false })
     .returns<CaseRow[]>();
@@ -66,6 +72,10 @@ export async function createCase(
   folderId: string,
   titulo: string,
   cliente?: string,
+  operacion?: string,
+  material?: string,
+  maquina?: string,
+  marcaPreferida?: string,
 ) {
   const { data, error } = await supabase
     .from("cases")
@@ -73,9 +83,15 @@ export async function createCase(
       folder_id: folderId,
       titulo,
       cliente: cliente || null,
+      operacion: operacion || null,
+      material: material || null,
+      maquina: maquina || null,
+      marca_preferida: marcaPreferida || null,
       estado: "abierto",
     })
-    .select("id, folder_id, titulo, cliente, estado, created_at")
+    .select(
+      "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, created_at",
+    )
     .single<CaseRow>();
 
   if (error) throw error;
