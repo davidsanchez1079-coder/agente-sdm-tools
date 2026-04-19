@@ -186,13 +186,13 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
   if (notFound) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950/60">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <p className="text-sm text-slate-700 dark:text-slate-300">
           No encontré ese caso. Puede estar borrado o no tienes acceso.
         </p>
         <Link
           href="/app/caso"
-          className="mt-4 inline-flex rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-700 transition hover:border-emerald-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-emerald-400"
+          className="mt-4 inline-flex rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-emerald-500 hover:bg-emerald-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:bg-emerald-400/10"
         >
           Volver a casos
         </Link>
@@ -205,21 +205,21 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const fabricanteLabel = describeFabricante(caseItem.marca_preferida);
 
   return (
-    <section className="grid min-w-0 gap-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link
-            href="/app/caso"
-            className="text-xs text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-300"
-          >
-            ← Volver a casos
-          </Link>
-          <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+    <section className="grid min-w-0 gap-6">
+      <div className="space-y-2">
+        <Link
+          href="/app/caso"
+          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-300"
+        >
+          ← Volver a casos
+        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             {caseItem.titulo}
           </h2>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+          <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
             {caseItem.estado}
-          </p>
+          </span>
         </div>
       </div>
 
@@ -239,7 +239,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         ) : null}
       </div>
 
-      <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 lg:p-6 dark:border-slate-800 dark:bg-slate-950/60">
+      <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <AgentModeSelect
           value={agentMode}
           onChange={setAgentMode}
@@ -247,7 +247,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         />
         <div className="grid gap-3">
           <textarea
-            className="min-h-32 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-emerald-400"
+            className="min-h-32 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             placeholder="Escribe el contexto técnico del caso"
@@ -257,7 +257,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             type="button"
             onClick={() => void handleSend()}
             disabled={sending || !chatInput.trim()}
-            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:hover:bg-emerald-300"
+            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
           >
             {sending ? "Guardando…" : "Enviar al caso"}
           </button>
@@ -269,13 +269,13 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           [...messages].reverse().map((entry) => (
             <article
               key={entry.id}
-              className={`rounded-xl border p-4 ${
+              className={`rounded-xl border p-4 shadow-sm dark:shadow-none ${
                 entry.author === "user"
-                  ? "border-emerald-500/40 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/5"
-                  : "border-cyan-500/40 bg-cyan-50 dark:border-cyan-500/30 dark:bg-cyan-500/5"
+                  ? "border-emerald-500/40 bg-emerald-50/80 dark:border-emerald-400/30 dark:bg-emerald-500/5"
+                  : "border-cyan-500/40 bg-cyan-50/80 dark:border-cyan-400/30 dark:bg-cyan-500/5"
               }`}
             >
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                 {entry.author === "user"
                   ? "Usuario"
                   : `Agente · ${entry.mode_used}`}
@@ -293,7 +293,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       </div>
 
       {message ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/80 dark:text-slate-300">
+        <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-300 dark:shadow-none">
           {message}
         </div>
       ) : null}
@@ -303,11 +303,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/70">
-      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm text-slate-900 dark:text-slate-100">
+      <p className="mt-2 break-words text-sm font-medium text-slate-900 dark:text-slate-100">
         {value}
       </p>
     </div>

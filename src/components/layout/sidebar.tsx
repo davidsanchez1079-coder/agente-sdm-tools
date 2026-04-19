@@ -43,23 +43,23 @@ export function Sidebar({
     router.replace("/");
   }
 
-  const asideWidth = collapsed ? "w-16" : "w-60";
+  const asideWidth = collapsed ? "w-16" : "w-64";
   const isDark = theme === "dark";
 
   return (
     <>
       <aside
-        className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-5 border-r border-slate-200 bg-white/90 p-4 transition-[width] duration-200 lg:flex dark:border-slate-800 dark:bg-slate-950/80 ${asideWidth}`}
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-5 border-r bg-white/90 p-4 shadow-sm transition-[width] duration-200 lg:flex dark:border-slate-800/80 dark:bg-slate-900/60 dark:shadow-none dark:backdrop-blur ${asideWidth}`}
       >
         <div
           className={`flex items-center gap-2 ${collapsed ? "justify-center" : "justify-between"}`}
         >
           {!collapsed ? (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.3em] text-cyan-600 dark:text-cyan-300">
+            <div className="min-w-0">
+              <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-200">
                 Agente SDM
-              </p>
-              <h1 className="mt-0.5 text-base font-semibold text-slate-900 dark:text-white">
+              </span>
+              <h1 className="mt-1.5 text-base font-semibold tracking-tight text-slate-900 dark:text-white">
                 Tools
               </h1>
             </div>
@@ -69,7 +69,7 @@ export function Sidebar({
             onClick={onToggleCollapsed}
             aria-label={collapsed ? "Expandir menú" : "Minimizar menú"}
             title={collapsed ? "Expandir menú" : "Minimizar menú"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-sm text-slate-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-slate-800 dark:text-slate-300 dark:hover:border-emerald-400 dark:hover:text-emerald-300"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-sm text-slate-600 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200"
           >
             {collapsed ? "»" : "«"}
           </button>
@@ -78,34 +78,34 @@ export function Sidebar({
         <nav className="flex flex-col gap-1">
           {NAV.map((item) => {
             const active = isActive(pathname, item.href);
-            const baseClass =
-              "rounded-xl border text-sm transition flex items-center";
-            const stateClass = active
-              ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-200"
-              : "border-transparent text-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900";
-            const sizeClass = collapsed
-              ? "justify-center h-10 w-full px-0"
-              : "px-3 py-2";
+            const base =
+              "rounded-xl text-sm transition flex items-center border";
+            const state = active
+              ? "border-emerald-500/30 bg-emerald-50 text-emerald-800 shadow-[inset_3px_0_0_0_rgb(5_150_105)] dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-100 dark:shadow-[inset_3px_0_0_0_rgb(52_211_153)]"
+              : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-800 dark:hover:bg-slate-900/80";
+            const size = collapsed
+              ? "h-10 w-full justify-center px-0"
+              : "px-3 py-2 pl-4";
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 title={collapsed ? item.label : undefined}
-                className={`${baseClass} ${stateClass} ${sizeClass}`}
+                className={`${base} ${state} ${size}`}
               >
                 {collapsed ? (
                   <span className="text-xs font-semibold tracking-wider">
                     {item.short}
                   </span>
                 ) : (
-                  item.label
+                  <span className="font-medium">{item.label}</span>
                 )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto grid gap-2">
+        <div className="mt-auto grid gap-2 border-t border-slate-200 pt-4 dark:border-slate-800/70">
           <button
             type="button"
             onClick={onToggleTheme}
@@ -113,20 +113,24 @@ export function Sidebar({
               isDark ? "Cambiar a tema claro" : "Cambiar a tema oscuro"
             }
             title={isDark ? "Tema claro" : "Tema oscuro"}
-            className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:border-emerald-400 dark:hover:text-emerald-300 ${collapsed ? "justify-center" : ""}`}
+            className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200 ${collapsed ? "justify-center" : ""}`}
           >
-            <span aria-hidden>{isDark ? "☀" : "☾"}</span>
+            <span aria-hidden className="text-base">
+              {isDark ? "☀" : "☾"}
+            </span>
             {!collapsed ? (
-              <span>{isDark ? "Tema claro" : "Tema oscuro"}</span>
+              <span className="font-medium">
+                {isDark ? "Tema claro" : "Tema oscuro"}
+              </span>
             ) : null}
           </button>
 
           {!collapsed ? (
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900/70">
-              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800/80 dark:bg-slate-950/60">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
                 Sesión
               </p>
-              <p className="mt-1 truncate text-sm text-slate-900 dark:text-white">
+              <p className="mt-1 truncate text-sm font-medium text-slate-900 dark:text-white">
                 {userName}
               </p>
               <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
@@ -139,19 +143,19 @@ export function Sidebar({
             type="button"
             onClick={() => void handleLogout()}
             title="Cerrar sesión"
-            className={`rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 transition hover:border-rose-500 hover:text-rose-600 dark:border-slate-800 dark:text-slate-200 dark:hover:border-rose-400 dark:hover:text-rose-300 ${collapsed ? "flex items-center justify-center" : ""}`}
+            className={`rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:border-rose-500 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-rose-400/60 dark:hover:bg-rose-500/10 dark:hover:text-rose-200 ${collapsed ? "flex items-center justify-center" : ""}`}
           >
             {collapsed ? <span aria-hidden>⎋</span> : "Cerrar sesión"}
           </button>
         </div>
       </aside>
 
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden dark:border-slate-800 dark:bg-slate-950/90">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden dark:border-slate-800/80 dark:bg-slate-900/70">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-cyan-600 dark:text-cyan-300">
+          <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.25em] text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-200">
             Agente SDM
-          </p>
-          <p className="truncate text-sm text-slate-900 dark:text-white">
+          </span>
+          <p className="mt-0.5 truncate text-sm font-medium text-slate-900 dark:text-white">
             {userName}
           </p>
         </div>
@@ -172,17 +176,17 @@ export function Sidebar({
         </button>
       </header>
 
-      <nav className="sticky top-[3.25rem] z-10 flex gap-1 overflow-x-auto border-b border-slate-200 bg-white/80 px-3 py-2 lg:hidden dark:border-slate-800 dark:bg-slate-950/80">
+      <nav className="sticky top-[3.25rem] z-10 flex gap-1 overflow-x-auto border-b border-slate-200 bg-white/80 px-3 py-2 lg:hidden dark:border-slate-800/80 dark:bg-slate-900/60">
         {NAV.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
+              className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-medium transition ${
                 active
                   ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-200"
-                  : "border-transparent text-slate-700 hover:border-slate-300 dark:text-slate-300 dark:hover:border-slate-700"
+                  : "border-transparent text-slate-700 hover:border-slate-200 dark:text-slate-300 dark:hover:border-slate-800"
               }`}
             >
               {item.label}
