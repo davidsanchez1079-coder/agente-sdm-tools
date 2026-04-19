@@ -4,7 +4,7 @@ export type BrandId =
   | "vargus"
   | "korloy"
   | "dormer"
-  | "boehlerit";
+  | "amec";
 
 export type BrandStatus = "always" | "indexed" | "coming_soon";
 
@@ -50,10 +50,11 @@ export const BRANDS: readonly Brand[] = [
     description: "Especialista Dormer Pramet. Entra en V1.2.",
   },
   {
-    id: "boehlerit",
-    label: "Boehlerit",
+    id: "amec",
+    label: "Amec",
     status: "coming_soon",
-    description: "Especialista Boehlerit. Entra en V1.3.",
+    description:
+      "Especialista Amec. Enfocado a taladrado modular y entero.",
   },
 ] as const;
 

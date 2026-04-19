@@ -15,10 +15,18 @@ type AppShellState =
   | { status: "unauth" }
   | { status: "ready"; value: WorkspaceContextValue };
 
+type Theme = "light" | "dark";
+
+const THEME_KEY = "sdm-theme";
+const COLLAPSED_KEY = "sdm-sidebar-collapsed";
+
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<AppShellState>({ status: "loading" });
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [collapsed, setCollapsed] = useState(false);
 
+  // Sesión + workspace
   useEffect(() => {
     let cancelled = false;
     const supabase = getSupabaseBrowserClient();
@@ -68,9 +76,55 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [router]);
 
+  // Hidrata preferencias del usuario (tema + sidebar).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const storedTheme = localStorage.getItem(THEME_KEY);
+        const storedCollapsed = localStorage.getItem(COLLAPSED_KEY);
+        if (cancelled) return;
+        if (storedTheme === "light" || storedTheme === "dark") {
+          setTheme(storedTheme);
+        }
+        if (storedCollapsed === "1") {
+          setCollapsed(true);
+        }
+      } catch {
+        // localStorage bloqueado: nos quedamos con defaults.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Aplica tema al <html> y persiste.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = document.documentElement;
+    if (theme === "dark") html.classList.add("dark");
+    else html.classList.remove("dark");
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // noop
+    }
+  }, [theme]);
+
+  // Persiste minimización del sidebar.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+    } catch {
+      // noop
+    }
+  }, [collapsed]);
+
   if (state.status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-slate-500 dark:text-slate-400">
         Cargando sesión…
       </div>
     );
@@ -87,8 +141,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceProvider value={state.value}>
-      <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100 lg:flex-row">
-        <Sidebar userName={displayName} email={appUser.email} />
+      <div className="flex min-h-screen flex-col bg-background text-foreground lg:flex-row">
+        <Sidebar
+          userName={displayName}
+          email={appUser.email}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed((value) => !value)}
+          theme={theme}
+          onToggleTheme={() =>
+            setTheme((value) => (value === "dark" ? "light" : "dark"))
+          }
+        />
         <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
           {children}
         </main>
