@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useWorkspace } from "@/lib/workspace/context";
 import { FolderPanel } from "@/components/workspace/folder-panel";
 import { CaseForm } from "@/components/workspace/case-form";
 import { CaseList } from "@/components/workspace/case-list";
+import { CaseFilters } from "@/components/workspace/case-filters";
 import {
   MODULE_BAR,
   MODULE_CHIP,
@@ -39,8 +40,9 @@ export default function CasoIndexPage() {
           Carpetas y casos
         </h2>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-          Selecciona una carpeta para ver sus casos. Toca un caso para abrir
-          su conversación con el agente.
+          Selecciona una carpeta para ver sus casos. Usa la barra superior
+          para buscar, filtrar y ordenar; los filtros quedan en la URL y
+          sobreviven el refresh.
         </p>
       </header>
 
@@ -70,11 +72,27 @@ export default function CasoIndexPage() {
             onMessage={setMessage}
           />
 
-          <CaseList
-            folderId={selectedFolderId}
-            refreshToken={refreshToken}
-            onMessage={setMessage}
-          />
+          <Suspense
+            fallback={
+              <div className="h-12 animate-pulse rounded-2xl border border-slate-200 bg-white/50 dark:border-slate-800/80 dark:bg-slate-900/30" />
+            }
+          >
+            <CaseFilters />
+          </Suspense>
+
+          <Suspense
+            fallback={
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Cargando casos…
+              </p>
+            }
+          >
+            <CaseList
+              folderId={selectedFolderId}
+              refreshToken={refreshToken}
+              onMessage={setMessage}
+            />
+          </Suspense>
         </section>
       </div>
 
