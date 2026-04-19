@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
 import { isAllowedEmail } from "@/lib/auth/allowed-emails";
+import { ensureWorkspaceForUser } from "@/lib/workspace/bootstrap";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
 export function AuthShell() {
   const env = getClientEnv();
@@ -20,6 +23,12 @@ export function AuthShell() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState<"signin" | "signup" | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [workspaceState, setWorkspaceState] = useState<{
+    userName: string;
+    email: string;
+    workspaceId: string;
+  } | null>(null);
 
   const authStatus = searchParams.get("auth");
   const callbackMessage =
@@ -62,12 +71,33 @@ export function AuthShell() {
       return;
     }
 
+    if (mode === "signin" && response.data.session) {
+      setSession(response.data.session);
+
+      const workspaceData = await ensureWorkspaceForUser(supabase, response.data.session.user);
+      setWorkspaceState({
+        userName: workspaceData.appUser.nombre,
+        email: workspaceData.appUser.email,
+        workspaceId: workspaceData.workspace.id,
+      });
+    }
+
     setMessage(
       mode === "signup"
         ? "Cuenta creada. Revise su correo si Supabase pide confirmación."
         : "Sesión iniciada correctamente.",
     );
     setLoading(null);
+  }
+
+  if (session && workspaceState) {
+    return (
+      <WorkspaceShell
+        userName={workspaceState.userName}
+        email={workspaceState.email}
+        workspaceId={workspaceState.workspaceId}
+      />
+    );
   }
 
   return (
