@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { listMessages } from "@/lib/workspace/messages";
 import { updateCase, type CaseRow } from "@/lib/workspace/folders";
@@ -33,9 +34,12 @@ import {
 import { ModuleIcon } from "@/components/ui/module-icon";
 import { AgentModeSelect } from "./agent-mode-select";
 import { CaseAttachments } from "./case-attachments";
-import { AttachmentSelector } from "./attachment-selector";
 import {
+  ATTACHMENT_ACCEPT,
+  MAX_ATTACHMENT_BYTES,
+  getSignedUrl,
   listAttachments,
+  uploadAttachment,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
 
@@ -121,6 +125,13 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<
     string[]
   >([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [chipPreviewUrls, setChipPreviewUrls] = useState<
+    Record<string, string>
+  >({});
+  const filePickerRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,6 +185,76 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       cancelled = true;
     };
   }, [caseId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = getSupabaseBrowserClient();
+      const next: Record<string, string> = {};
+      for (const id of selectedAttachmentIds) {
+        const row = attachments.find((r) => r.id === id);
+        if (!row || row.kind !== "image") continue;
+        if (chipPreviewUrls[id]) {
+          next[id] = chipPreviewUrls[id];
+          continue;
+        }
+        try {
+          next[id] = await getSignedUrl(supabase, row.storage_path, 3600);
+        } catch {
+          // si falla, el chip se muestra sin thumb
+        }
+      }
+      if (!cancelled) setChipPreviewUrls(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAttachmentIds, attachments]);
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    if (!caseItem) return;
+    setUploading(true);
+    setUploadError(null);
+    const supabase = getSupabaseBrowserClient();
+    let current = attachments;
+    const newlyUploaded: string[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setUploadError(
+          `"${file.name}" supera los 20 MB. Se omitió. Puedes reducir el tamaño y reintentar.`,
+        );
+        continue;
+      }
+      try {
+        const row = await uploadAttachment(supabase, caseItem.id, file);
+        current = [row, ...current];
+        setAttachments(current);
+        newlyUploaded.push(row.id);
+      } catch (error) {
+        setUploadError(
+          error instanceof Error
+            ? error.message
+            : `Error al subir "${file.name}".`,
+        );
+      }
+    }
+    if (newlyUploaded.length > 0) {
+      setSelectedAttachmentIds((prev) => {
+        const set = new Set(prev);
+        for (const id of newlyUploaded) set.add(id);
+        return Array.from(set);
+      });
+    }
+    setUploading(false);
+  }
+
+  function toggleSelectAttachment(id: string) {
+    setSelectedAttachmentIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   async function handleSaveResumen() {
     if (!caseItem) return;
@@ -521,47 +602,188 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           disabled={sending}
         />
         <div className="grid gap-4">
-          <textarea
-            className={`${controlClass} min-h-32`}
-            value={chatInput}
-            onChange={(event) => setChatInput(event.target.value)}
-            placeholder="Escribe el contexto técnico del caso"
-            disabled={sending}
-          />
+          <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-950/60">
+            <input
+              ref={filePickerRef}
+              type="file"
+              accept={ATTACHMENT_ACCEPT}
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                void handleFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(event) => {
+                void handleFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+
+            {selectedAttachmentIds.length > 0 ? (
+              <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800/80 dark:bg-slate-900/40">
+                {selectedAttachmentIds.map((id) => {
+                  const row = attachments.find((r) => r.id === id);
+                  if (!row) return null;
+                  const thumb = chipPreviewUrls[id];
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-500/50 bg-emerald-100 py-1 pl-1 pr-2 text-xs text-emerald-900 dark:border-emerald-400/50 dark:bg-emerald-500/15 dark:text-emerald-100"
+                    >
+                      {row.kind === "image" && thumb ? (
+                        <span className="relative block h-6 w-6 overflow-hidden rounded-full border border-emerald-500/40 dark:border-emerald-400/40">
+                          <Image
+                            src={thumb}
+                            alt=""
+                            fill
+                            sizes="24px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </span>
+                      ) : (
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-200 text-[9px] font-bold uppercase tracking-wider text-emerald-900 dark:bg-emerald-500/30 dark:text-emerald-50">
+                          {row.kind === "pdf" ? "PDF" : "Arch"}
+                        </span>
+                      )}
+                      <span
+                        className="max-w-[14ch] truncate font-medium"
+                        title={row.filename}
+                      >
+                        {row.filename}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectAttachment(id)}
+                        aria-label={`Quitar ${row.filename} del mensaje`}
+                        disabled={sending}
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-50 dark:text-emerald-100 dark:hover:bg-emerald-500/25"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-3 w-3"
+                          aria-hidden="true"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <textarea
+              className="w-full resize-none border-0 bg-transparent px-3 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-60 dark:text-slate-100 dark:placeholder:text-slate-500"
+              rows={5}
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder={
+                selectedAttachmentIds.length > 0
+                  ? "Escribe la instrucción sobre los adjuntos y envía."
+                  : "Escribe tu mensaje. Puedes adjuntar foto o PDF abajo."
+              }
+              disabled={sending}
+            />
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-2 py-2 dark:border-slate-800/80 dark:bg-slate-900/40">
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => cameraRef.current?.click()}
+                  disabled={uploading || sending}
+                  aria-label="Tomar foto"
+                  title="Tomar foto"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-200"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  Foto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => filePickerRef.current?.click()}
+                  disabled={uploading || sending}
+                  aria-label="Adjuntar archivo"
+                  title="Adjuntar archivo"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-200"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  Archivo
+                </button>
+                {uploading ? (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Subiendo…
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={sending || uploading || !chatInput.trim()}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
+              >
+                {sending ? "Enviando…" : "Enviar"}
+              </button>
+            </div>
+          </div>
+
+          {uploadError ? (
+            <p className="text-xs text-amber-600 dark:text-amber-300">
+              {uploadError}
+            </p>
+          ) : null}
+
           <CaseAttachments
-            caseId={caseItem.id}
             attachments={attachments}
+            selectedIds={selectedAttachmentIds}
+            onToggleSelect={toggleSelectAttachment}
             onChange={(next) => {
               setAttachments(next);
-              // Si el usuario borra un adjunto que estaba seleccionado para
-              // el próximo mensaje, lo saco del set seleccionado también.
+              // Si se borra un adjunto seleccionado, sale del set.
               setSelectedAttachmentIds((prev) =>
                 prev.filter((id) => next.some((row) => row.id === id)),
               );
             }}
-            onUpload={(row) => {
-              // Al subir/tomar durante la redacción, el adjunto queda
-              // auto-seleccionado para este turno. El usuario puede quitarlo
-              // con la pill si no lo quiere mandar ahora.
-              setSelectedAttachmentIds((prev) =>
-                prev.includes(row.id) ? prev : [...prev, row.id],
-              );
-            }}
           />
-          <AttachmentSelector
-            attachments={attachments}
-            selectedIds={selectedAttachmentIds}
-            onChange={setSelectedAttachmentIds}
-            disabled={sending}
-          />
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={sending || !chatInput.trim()}
-            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
-          >
-            {sending ? "Guardando…" : "Enviar al caso"}
-          </button>
         </div>
       </div>
 
