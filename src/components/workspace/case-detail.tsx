@@ -32,6 +32,12 @@ import {
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
 import { AgentModeSelect } from "./agent-mode-select";
+import { CaseAttachments } from "./case-attachments";
+import { AttachmentSelector } from "./attachment-selector";
+import {
+  listAttachments,
+  type AttachmentRow,
+} from "@/lib/workspace/attachments";
 
 type MessageRow = {
   id: string;
@@ -111,6 +117,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [savingRap, setSavingRap] = useState(false);
   const [savingPotencial, setSavingPotencial] = useState(false);
 
+  const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<
+    string[]
+  >([]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -137,9 +148,16 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             : "",
         );
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
+        setSelectedAttachmentIds([]);
 
-        const msgs = await listMessages(supabase, caseId);
-        if (!cancelled) setMessages(msgs);
+        const [msgs, atts] = await Promise.all([
+          listMessages(supabase, caseId),
+          listAttachments(supabase, caseId),
+        ]);
+        if (!cancelled) {
+          setMessages(msgs);
+          setAttachments(atts);
+        }
       } catch (error) {
         if (!cancelled) {
           setMessage(
@@ -346,6 +364,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           caseId: caseItem.id,
           content: text,
           mode: agentMode,
+          attachmentIds: selectedAttachmentIds,
         }),
       });
 
@@ -373,6 +392,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         payload.agentMessage as MessageRow,
       ]);
       setChatInput("");
+      setSelectedAttachmentIds([]);
       setMessage("Mensaje guardado.");
     } catch (error) {
       setMessage(
@@ -501,6 +521,12 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           disabled={sending}
         />
         <div className="grid gap-3">
+          <AttachmentSelector
+            attachments={attachments}
+            selectedIds={selectedAttachmentIds}
+            onChange={setSelectedAttachmentIds}
+            disabled={sending}
+          />
           <textarea
             className={`${controlClass} min-h-32`}
             value={chatInput}
@@ -808,6 +834,19 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           </p>
         </div>
       ) : null}
+
+      <CaseAttachments
+        caseId={caseItem.id}
+        attachments={attachments}
+        onChange={(next) => {
+          setAttachments(next);
+          // Si el usuario borra un adjunto que estaba seleccionado para el
+          // próximo mensaje, lo saco del set seleccionado también.
+          setSelectedAttachmentIds((prev) =>
+            prev.filter((id) => next.some((row) => row.id === id)),
+          );
+        }}
+      />
 
       <section className="grid gap-3">
         <header>

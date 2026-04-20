@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import { respondToCase } from "@/lib/agent/orchestrator";
+import { fetchAttachmentsAsContentBlocks } from "@/lib/agent/attachments";
 import type { CaseRow } from "@/lib/workspace/folders";
 
 type Body = {
   caseId?: unknown;
   content?: unknown;
   mode?: unknown;
+  attachmentIds?: unknown;
 };
 
 const CASE_COLUMNS =
@@ -39,6 +41,12 @@ export async function POST(request: NextRequest) {
   const mode: BrandId = (ALL_BRAND_IDS as string[]).includes(modeRaw)
     ? (modeRaw as BrandId)
     : "general";
+
+  const attachmentIds: string[] = Array.isArray(body.attachmentIds)
+    ? body.attachmentIds.filter(
+        (value): value is string => typeof value === "string",
+      )
+    : [];
 
   if (!caseId) return jsonError("caseId requerido.", 400);
   if (!content) return jsonError("content requerido.", 400);
@@ -101,6 +109,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let userContentBlocks;
+  try {
+    userContentBlocks =
+      attachmentIds.length > 0
+        ? await fetchAttachmentsAsContentBlocks(
+            supabase,
+            caseId,
+            attachmentIds,
+          )
+        : undefined;
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los adjuntos seleccionados.",
+        userMessage,
+      },
+      { status: 502 },
+    );
+  }
+
   let agentResult;
   try {
     agentResult = await respondToCase({
@@ -113,6 +144,7 @@ export async function POST(request: NextRequest) {
         { author: "user" as const, content },
       ],
       mode,
+      userContentBlocks,
     });
   } catch (error) {
     return NextResponse.json(
