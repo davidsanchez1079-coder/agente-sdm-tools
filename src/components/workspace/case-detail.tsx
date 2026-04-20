@@ -420,6 +420,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
   return (
     <section className="grid min-w-0 gap-6">
+      {/* Header con breadcrumb, título y etiquetas rápidas */}
       <div
         className={`relative space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.caso}`}
       >
@@ -455,6 +456,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           >
             Prioridad {prioridadLabel(caseItem.prioridad)}
           </span>
+          {caseItem.cliente ? (
+            <span className="rounded-full border border-cyan-500/40 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-800 dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200">
+              {caseItem.cliente}
+            </span>
+          ) : null}
           {caseItem.resultado_cierre ? (
             <span
               className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${resultadoCierreBadge(caseItem.resultado_cierre)}`}
@@ -468,6 +474,68 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             </span>
           ) : null}
         </div>
+      </div>
+
+      {/* Chat — espacio de trabajo primario */}
+      <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <AgentModeSelect
+          value={agentMode}
+          onChange={setAgentMode}
+          disabled={sending}
+        />
+        <div className="grid gap-3">
+          <textarea
+            className={`${controlClass} min-h-32`}
+            value={chatInput}
+            onChange={(event) => setChatInput(event.target.value)}
+            placeholder="Escribe el contexto técnico del caso"
+            disabled={sending}
+          />
+          <button
+            type="button"
+            onClick={() => void handleSend()}
+            disabled={sending || !chatInput.trim()}
+            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
+          >
+            {sending ? "Guardando…" : "Enviar al caso"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3">
+        {messages.length ? (
+          [...messages].reverse().map((entry) => (
+            <article
+              key={entry.id}
+              className={`rounded-xl border p-4 shadow-sm dark:shadow-none ${
+                entry.author === "user"
+                  ? "border-emerald-500/40 bg-emerald-50/80 dark:border-emerald-400/30 dark:bg-emerald-500/5"
+                  : "border-cyan-500/40 bg-cyan-50/80 dark:border-cyan-400/30 dark:bg-cyan-500/5"
+              }`}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                {entry.author === "user"
+                  ? "Usuario"
+                  : `Agente · ${entry.mode_used}`}
+              </p>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-900 dark:text-slate-100">
+                {entry.content}
+              </p>
+            </article>
+          ))
+        ) : (
+          <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Este caso todavía no tiene mensajes.
+          </p>
+        )}
+      </div>
+
+      {/* Ficha operativa — datos del caso para consulta y seguimiento */}
+      <div className="flex items-center gap-3 pt-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+          Ficha operativa
+        </span>
+        <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800/80" />
       </div>
 
       <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
@@ -737,59 +805,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           />
         </div>
       </section>
-
-      <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
-        <AgentModeSelect
-          value={agentMode}
-          onChange={setAgentMode}
-          disabled={sending}
-        />
-        <div className="grid gap-3">
-          <textarea
-            className={`${controlClass} min-h-32`}
-            value={chatInput}
-            onChange={(event) => setChatInput(event.target.value)}
-            placeholder="Escribe el contexto técnico del caso"
-            disabled={sending}
-          />
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={sending || !chatInput.trim()}
-            className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
-          >
-            {sending ? "Guardando…" : "Enviar al caso"}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-3">
-        {messages.length ? (
-          [...messages].reverse().map((entry) => (
-            <article
-              key={entry.id}
-              className={`rounded-xl border p-4 shadow-sm dark:shadow-none ${
-                entry.author === "user"
-                  ? "border-emerald-500/40 bg-emerald-50/80 dark:border-emerald-400/30 dark:bg-emerald-500/5"
-                  : "border-cyan-500/40 bg-cyan-50/80 dark:border-cyan-400/30 dark:bg-cyan-500/5"
-              }`}
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                {entry.author === "user"
-                  ? "Usuario"
-                  : `Agente · ${entry.mode_used}`}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-900 dark:text-slate-100">
-                {entry.content}
-              </p>
-            </article>
-          ))
-        ) : (
-          <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Este caso todavía no tiene mensajes.
-          </p>
-        )}
-      </div>
 
       {message ? (
         <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-300 dark:shadow-none">
