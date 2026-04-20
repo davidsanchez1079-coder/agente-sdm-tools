@@ -763,12 +763,12 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         </div>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {messages.length ? (
           [...messages].reverse().map((entry) => (
             <article
               key={entry.id}
-              className={`rounded-xl border p-4 shadow-sm dark:shadow-none ${
+              className={`rounded-xl border px-3.5 py-3 shadow-sm dark:shadow-none ${
                 entry.author === "user"
                   ? "border-emerald-500/40 bg-emerald-50/80 dark:border-emerald-400/30 dark:bg-emerald-500/5"
                   : "border-cyan-500/40 bg-cyan-50/80 dark:border-cyan-400/30 dark:bg-cyan-500/5"
@@ -779,9 +779,14 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                   ? "Usuario"
                   : `Agente · ${entry.mode_used}`}
               </p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-900 dark:text-slate-100">
-                {entry.content}
-              </p>
+              <div className="mt-1.5 space-y-1.5 text-sm leading-6 text-slate-900 dark:text-slate-100 [&_p]:whitespace-pre-wrap [&_p]:break-words">
+                {entry.content
+                  .split(/\n{2,}/)
+                  .filter((chunk) => chunk.trim().length > 0)
+                  .map((chunk, index) => (
+                    <p key={index}>{chunk}</p>
+                  ))}
+              </div>
             </article>
           ))
         ) : (
