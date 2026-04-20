@@ -38,6 +38,7 @@ import {
   AttachmentPreviewModal,
   type AttachmentPreview,
 } from "./attachment-preview-modal";
+import { MessageContent } from "./message-content";
 import {
   ATTACHMENT_ACCEPT,
   MAX_ATTACHMENT_BYTES,
@@ -804,12 +805,39 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                   : "border-cyan-500/40 bg-cyan-50/80 dark:border-cyan-400/30 dark:bg-cyan-500/5"
               }`}
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                  {entry.author === "user"
-                    ? "Usuario"
-                    : `Agente · ${entry.mode_used}`}
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                  {entry.author === "agent" ? (
+                    <span
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300"
+                      aria-label="Respuesta generada por IA"
+                      title="Generado por IA"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-3 w-3"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="8" width="18" height="12" rx="2" />
+                        <line x1="12" y1="4" x2="12" y2="8" />
+                        <circle cx="12" cy="3" r="1" />
+                        <circle cx="9" cy="13" r="1" fill="currentColor" />
+                        <circle cx="15" cy="13" r="1" fill="currentColor" />
+                        <line x1="9" y1="17" x2="15" y2="17" />
+                      </svg>
+                    </span>
+                  ) : null}
+                  <span>
+                    {entry.author === "user"
+                      ? "Usuario"
+                      : `Agente IA · ${entry.mode_used}`}
+                  </span>
+                </div>
                 <time
                   dateTime={entry.created_at}
                   className="text-[10px] font-medium tabular-nums text-slate-500 dark:text-slate-400"
@@ -817,13 +845,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                   {formatMessageTime(entry.created_at)}
                 </time>
               </div>
-              <div className="mt-1.5 space-y-1.5 text-sm leading-6 text-slate-900 dark:text-slate-100 [&_p]:whitespace-pre-wrap [&_p]:break-words">
-                {entry.content
-                  .split(/\n{2,}/)
-                  .filter((chunk) => chunk.trim().length > 0)
-                  .map((chunk, index) => (
-                    <p key={index}>{chunk}</p>
-                  ))}
+              <div className="mt-1.5">
+                <MessageContent content={entry.content} />
               </div>
               {entry.author === "user" &&
               entry.attachment_ids.length > 0 ? (
