@@ -539,6 +539,14 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 prev.filter((id) => next.some((row) => row.id === id)),
               );
             }}
+            onUpload={(row) => {
+              // Al subir/tomar durante la redacción, el adjunto queda
+              // auto-seleccionado para este turno. El usuario puede quitarlo
+              // con la pill si no lo quiere mandar ahora.
+              setSelectedAttachmentIds((prev) =>
+                prev.includes(row.id) ? prev : [...prev, row.id],
+              );
+            }}
           />
           <AttachmentSelector
             attachments={attachments}
