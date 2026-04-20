@@ -5,6 +5,7 @@ import {
   buildSystemBlocks,
   type BuildSystemBlocksOptions,
 } from "./prompts";
+import type { UserContentBlock } from "./attachments";
 
 type Turn = {
   author: "user" | "agent";
@@ -56,22 +57,45 @@ export async function respondToCase({
   history,
   mode,
   sources,
+  userContentBlocks,
 }: {
   caseRow: CaseRow;
   history: Turn[];
   mode: BrandId;
   sources?: RespondToCaseOptions;
+  /**
+   * Bloques multimodales (imagen, PDF) que se inyectan en el ÚLTIMO
+   * turno del historial cuando ese turno es del usuario. Permite que
+   * el agente analice adjuntos específicos del caso seleccionados por
+   * el usuario para esta pregunta.
+   */
+  userContentBlocks?: UserContentBlock[];
 }): Promise<AgentResult> {
   const client = getAnthropicClient();
   const model = getAnthropicModel();
 
   const systemBlocks = buildSystemBlocks(mode, caseRow, sources);
 
-  const messages = history.slice(-20).map((turn) => ({
-    role:
-      turn.author === "agent" ? ("assistant" as const) : ("user" as const),
-    content: turn.content,
-  }));
+  const trimmed = history.slice(-20);
+  const hasAttachments =
+    userContentBlocks !== undefined && userContentBlocks.length > 0;
+  const messages = trimmed.map((turn, index) => {
+    const isLast = index === trimmed.length - 1;
+    if (isLast && hasAttachments && turn.author === "user") {
+      return {
+        role: "user" as const,
+        content: [
+          { type: "text" as const, text: turn.content },
+          ...(userContentBlocks ?? []),
+        ],
+      };
+    }
+    return {
+      role:
+        turn.author === "agent" ? ("assistant" as const) : ("user" as const),
+      content: turn.content,
+    };
+  });
 
   const response = await client.messages.create({
     model,
