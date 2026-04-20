@@ -520,18 +520,30 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           onChange={setAgentMode}
           disabled={sending}
         />
-        <div className="grid gap-3">
-          <AttachmentSelector
-            attachments={attachments}
-            selectedIds={selectedAttachmentIds}
-            onChange={setSelectedAttachmentIds}
-            disabled={sending}
-          />
+        <div className="grid gap-4">
           <textarea
             className={`${controlClass} min-h-32`}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             placeholder="Escribe el contexto técnico del caso"
+            disabled={sending}
+          />
+          <CaseAttachments
+            caseId={caseItem.id}
+            attachments={attachments}
+            onChange={(next) => {
+              setAttachments(next);
+              // Si el usuario borra un adjunto que estaba seleccionado para
+              // el próximo mensaje, lo saco del set seleccionado también.
+              setSelectedAttachmentIds((prev) =>
+                prev.filter((id) => next.some((row) => row.id === id)),
+              );
+            }}
+          />
+          <AttachmentSelector
+            attachments={attachments}
+            selectedIds={selectedAttachmentIds}
+            onChange={setSelectedAttachmentIds}
             disabled={sending}
           />
           <button
@@ -834,19 +846,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           </p>
         </div>
       ) : null}
-
-      <CaseAttachments
-        caseId={caseItem.id}
-        attachments={attachments}
-        onChange={(next) => {
-          setAttachments(next);
-          // Si el usuario borra un adjunto que estaba seleccionado para el
-          // próximo mensaje, lo saco del set seleccionado también.
-          setSelectedAttachmentIds((prev) =>
-            prev.filter((id) => next.some((row) => row.id === id)),
-          );
-        }}
-      />
 
       <section className="grid gap-3">
         <header>

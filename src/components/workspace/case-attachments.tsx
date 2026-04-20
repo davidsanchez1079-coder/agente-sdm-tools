@@ -108,7 +108,7 @@ export function CaseAttachments({
   }
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+    <div className="grid gap-3">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
           Adjuntos del caso
