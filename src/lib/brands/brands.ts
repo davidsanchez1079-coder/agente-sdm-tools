@@ -61,3 +61,8 @@ export const BRANDS: readonly Brand[] = [
 export function getBrand(id: BrandId) {
   return BRANDS.find((brand) => brand.id === id) ?? BRANDS[0];
 }
+
+// Modos del agente habilitados. En v1 solo "general" tiene prompt real.
+// Para activar un modo especialista en v1.1: agregar su BrandId a esta
+// lista y añadir su prompt en src/lib/agent/prompts.ts.
+export const ENABLED_AGENT_MODES: BrandId[] = ["general"];
