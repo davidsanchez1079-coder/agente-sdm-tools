@@ -1,7 +1,10 @@
 import type { CaseRow } from "@/lib/workspace/folders";
 import type { BrandId } from "@/lib/brands/brands";
 import { getAnthropicClient, getAnthropicModel } from "./anthropic-client";
-import { BASE_RULES, buildCaseContext, buildModeNote } from "./prompts";
+import {
+  buildSystemBlocks,
+  type BuildSystemBlocksOptions,
+} from "./prompts";
 
 type Turn = {
   author: "user" | "agent";
@@ -46,38 +49,23 @@ function estimateCost(usage: {
   );
 }
 
+export type RespondToCaseOptions = BuildSystemBlocksOptions;
+
 export async function respondToCase({
   caseRow,
   history,
   mode,
+  sources,
 }: {
   caseRow: CaseRow;
   history: Turn[];
   mode: BrandId;
+  sources?: RespondToCaseOptions;
 }): Promise<AgentResult> {
   const client = getAnthropicClient();
   const model = getAnthropicModel();
 
-  const systemBlocks: {
-    type: "text";
-    text: string;
-    cache_control?: { type: "ephemeral" };
-  }[] = [
-    {
-      type: "text",
-      text: BASE_RULES,
-      cache_control: { type: "ephemeral" },
-    },
-    {
-      type: "text",
-      text: buildCaseContext(caseRow),
-    },
-  ];
-
-  const modeNote = buildModeNote(mode);
-  if (modeNote) {
-    systemBlocks.push({ type: "text", text: modeNote });
-  }
+  const systemBlocks = buildSystemBlocks(mode, caseRow, sources);
 
   const messages = history.slice(-20).map((turn) => ({
     role:
