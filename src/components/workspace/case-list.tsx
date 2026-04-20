@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   deleteCase,
@@ -14,6 +15,13 @@ import {
   prioridadBadge,
   prioridadLabel,
 } from "@/lib/cases/cases";
+import {
+  applyFilters,
+  hasAnyFilterOrQuery,
+  parseFiltersFromParams,
+  sortCases,
+} from "@/lib/cases/filters";
+import { formatPotencialUsd } from "@/lib/cases/cases";
 
 type CaseListProps = {
   folderId: string | null;
@@ -27,6 +35,12 @@ export function CaseList({
   refreshToken = 0,
 }: CaseListProps) {
   const [rows, setRows] = useState<CaseRow[]>([]);
+  const searchParams = useSearchParams();
+
+  const filters = useMemo(
+    () => parseFiltersFromParams(new URLSearchParams(searchParams.toString())),
+    [searchParams],
+  );
 
   const notify = useCallback(
     (msg: string | null) => {
@@ -84,7 +98,12 @@ export function CaseList({
     );
   }
 
-  if (!rows.length) {
+  const filtered = sortCases(applyFilters(rows, filters), filters.sort);
+  const totalBefore = rows.length;
+  const totalAfter = filtered.length;
+  const anyFilter = hasAnyFilterOrQuery(filters);
+
+  if (!totalBefore) {
     return (
       <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
         Esta carpeta todavía no tiene casos.
@@ -92,9 +111,26 @@ export function CaseList({
     );
   }
 
+  if (!totalAfter) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+        Ningún caso coincide con los filtros actuales. Ajusta o limpia
+        filtros para ver los {totalBefore}{" "}
+        {totalBefore === 1 ? "caso" : "casos"} de esta carpeta.
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-2">
-      {rows.map((row) => (
+      {anyFilter ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Mostrando {totalAfter} de {totalBefore}{" "}
+          {totalBefore === 1 ? "caso" : "casos"}.
+        </p>
+      ) : null}
+
+      {filtered.map((row) => (
         <div
           key={row.id}
           className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3 pl-5 shadow-sm transition duration-150 hover:border-emerald-500/50 hover:shadow-md dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-emerald-400/50 dark:hover:bg-slate-900/70 before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-emerald-500/70 dark:before:bg-emerald-400/70"
@@ -119,6 +155,16 @@ export function CaseList({
                 >
                   {prioridadLabel(row.prioridad)}
                 </span>
+                {row.requiere_rap ? (
+                  <span className="rounded-full border border-violet-500/40 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200">
+                    RAP
+                  </span>
+                ) : null}
+                {row.potencial_usd != null ? (
+                  <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    {formatPotencialUsd(row.potencial_usd)}
+                  </span>
+                ) : null}
               </div>
 
               {row.siguiente_accion ? (
