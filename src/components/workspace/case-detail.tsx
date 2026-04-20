@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { listMessages } from "@/lib/workspace/messages";
+import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import { updateCase, type CaseRow } from "@/lib/workspace/folders";
 import {
   BRANDS,
@@ -35,6 +35,10 @@ import { ModuleIcon } from "@/components/ui/module-icon";
 import { AgentModeSelect } from "./agent-mode-select";
 import { CaseAttachments } from "./case-attachments";
 import {
+  AttachmentPreviewModal,
+  type AttachmentPreview,
+} from "./attachment-preview-modal";
+import {
   ATTACHMENT_ACCEPT,
   MAX_ATTACHMENT_BYTES,
   getSignedUrl,
@@ -42,15 +46,6 @@ import {
   uploadAttachment,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
-
-type MessageRow = {
-  id: string;
-  case_id: string;
-  author: "user" | "agent";
-  content: string;
-  mode_used: BrandId;
-  created_at: string;
-};
 
 type CaseDetailProps = {
   caseId: string;
@@ -127,9 +122,10 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   >([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [chipPreviewUrls, setChipPreviewUrls] = useState<
+  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<
     Record<string, string>
   >({});
+  const [preview, setPreview] = useState<AttachmentPreview | null>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -191,26 +187,34 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     (async () => {
       const supabase = getSupabaseBrowserClient();
       const next: Record<string, string> = {};
-      for (const id of selectedAttachmentIds) {
-        const row = attachments.find((r) => r.id === id);
-        if (!row || row.kind !== "image") continue;
-        if (chipPreviewUrls[id]) {
-          next[id] = chipPreviewUrls[id];
-          continue;
-        }
+      for (const row of attachments) {
+        if (row.kind !== "image") continue;
         try {
-          next[id] = await getSignedUrl(supabase, row.storage_path, 3600);
+          next[row.id] = await getSignedUrl(supabase, row.storage_path, 3600);
         } catch {
-          // si falla, el chip se muestra sin thumb
+          // si falla una URL, los demás siguen
         }
       }
-      if (!cancelled) setChipPreviewUrls(next);
+      if (!cancelled) setAttachmentPreviewUrls(next);
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAttachmentIds, attachments]);
+  }, [attachments]);
+
+  async function openAttachmentPreview(row: AttachmentRow) {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const url = await getSignedUrl(supabase, row.storage_path, 600);
+      setPreview({ row, url });
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo abrir el adjunto.",
+      );
+    }
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -631,7 +635,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 {selectedAttachmentIds.map((id) => {
                   const row = attachments.find((r) => r.id === id);
                   if (!row) return null;
-                  const thumb = chipPreviewUrls[id];
+                  const thumb = attachmentPreviewUrls[id];
                   return (
                     <span
                       key={id}
@@ -775,6 +779,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           <CaseAttachments
             attachments={attachments}
             selectedIds={selectedAttachmentIds}
+            previewUrls={attachmentPreviewUrls}
             onToggleSelect={toggleSelectAttachment}
             onChange={(next) => {
               setAttachments(next);
@@ -783,6 +788,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 prev.filter((id) => next.some((row) => row.id === id)),
               );
             }}
+            onOpen={openAttachmentPreview}
           />
         </div>
       </div>
@@ -819,6 +825,55 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                     <p key={index}>{chunk}</p>
                   ))}
               </div>
+              {entry.author === "user" &&
+              entry.attachment_ids.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {entry.attachment_ids.map((attId) => {
+                    const row = attachments.find((r) => r.id === attId);
+                    if (!row) {
+                      return (
+                        <span
+                          key={attId}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400"
+                        >
+                          Adjunto eliminado
+                        </span>
+                      );
+                    }
+                    const thumb = attachmentPreviewUrls[attId];
+                    const isImage = row.kind === "image";
+                    return (
+                      <button
+                        key={attId}
+                        type="button"
+                        onClick={() => void openAttachmentPreview(row)}
+                        className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-emerald-500/40 bg-white px-2 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm transition hover:border-emerald-500 hover:bg-emerald-50 dark:border-emerald-400/40 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:bg-emerald-500/10"
+                        title={row.filename}
+                      >
+                        {isImage && thumb ? (
+                          <span className="relative block h-10 w-10 overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                            <Image
+                              src={thumb}
+                              alt=""
+                              fill
+                              sizes="40px"
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </span>
+                        ) : (
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-[9px] font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            {row.kind === "pdf" ? "PDF" : "Arch"}
+                          </span>
+                        )}
+                        <span className="max-w-[18ch] truncate">
+                          {row.filename}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </article>
           ))
         ) : (
@@ -1109,6 +1164,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           {message}
         </div>
       ) : null}
+
+      <AttachmentPreviewModal
+        preview={preview}
+        onClose={() => setPreview(null)}
+      />
     </section>
   );
 }

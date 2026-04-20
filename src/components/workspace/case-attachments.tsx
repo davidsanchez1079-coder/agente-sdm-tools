@@ -1,69 +1,31 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   deleteAttachment,
-  getSignedUrl,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
 
 type CaseAttachmentsProps = {
   attachments: AttachmentRow[];
   selectedIds: string[];
+  previewUrls: Record<string, string>;
   onToggleSelect: (id: string) => void;
   onChange: (next: AttachmentRow[]) => void;
-};
-
-type PreviewState = {
-  row: AttachmentRow;
-  url: string;
+  onOpen: (row: AttachmentRow) => void | Promise<void>;
 };
 
 export function CaseAttachments({
   attachments,
   selectedIds,
+  previewUrls,
   onToggleSelect,
   onChange,
+  onOpen,
 }: CaseAttachmentsProps) {
   const [message, setMessage] = useState<string | null>(null);
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
-  const [preview, setPreview] = useState<PreviewState | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const supabase = getSupabaseBrowserClient();
-      const next: Record<string, string> = {};
-      for (const row of attachments) {
-        if (row.kind !== "image") continue;
-        try {
-          next[row.id] = await getSignedUrl(supabase, row.storage_path, 3600);
-        } catch {
-          // si falla una URL, los demás siguen funcionando
-        }
-      }
-      if (!cancelled) setPreviewUrls(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [attachments]);
-
-  useEffect(() => {
-    if (!preview) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setPreview(null);
-    }
-    window.addEventListener("keydown", onKey);
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [preview]);
 
   async function handleDelete(row: AttachmentRow) {
     try {
@@ -75,20 +37,6 @@ export function CaseAttachments({
         error instanceof Error
           ? error.message
           : "No se pudo eliminar el adjunto.",
-      );
-    }
-  }
-
-  async function handleOpen(row: AttachmentRow) {
-    try {
-      const supabase = getSupabaseBrowserClient();
-      const url = await getSignedUrl(supabase, row.storage_path, 600);
-      setPreview({ row, url });
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo abrir el adjunto.",
       );
     }
   }
@@ -121,7 +69,7 @@ export function CaseAttachments({
               {row.kind === "image" && previewUrls[row.id] ? (
                 <button
                   type="button"
-                  onClick={() => void handleOpen(row)}
+                  onClick={() => void onOpen(row)}
                   className="relative block h-32 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800"
                 >
                   <Image
@@ -136,7 +84,7 @@ export function CaseAttachments({
               ) : (
                 <button
                   type="button"
-                  onClick={() => void handleOpen(row)}
+                  onClick={() => void onOpen(row)}
                   className="flex h-32 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
                 >
                   {row.kind === "pdf" ? "PDF" : "Archivo"}
@@ -179,82 +127,6 @@ export function CaseAttachments({
         <p className="text-xs text-amber-600 dark:text-amber-300">
           {message}
         </p>
-      ) : null}
-
-      {preview ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Vista previa de ${preview.row.filename}`}
-          className="fixed inset-0 z-50 flex flex-col bg-slate-950/85 backdrop-blur-sm"
-          onClick={() => setPreview(null)}
-        >
-          <div className="flex items-center justify-between gap-2 px-4 py-3 text-white">
-            <span
-              className="min-w-0 flex-1 truncate text-sm font-medium"
-              title={preview.row.filename}
-            >
-              {preview.row.filename}
-            </span>
-            <a
-              href={preview.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20"
-            >
-              Abrir en pestaña
-            </a>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPreview(null);
-              }}
-              aria-label="Cerrar vista previa"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/30 bg-white/10 text-white transition hover:bg-white/20"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-5 w-5"
-                aria-hidden="true"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-          <div
-            className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {preview.row.kind === "image" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preview.url}
-                alt={preview.row.filename}
-                className="max-h-full max-w-full rounded-lg object-contain shadow-xl"
-              />
-            ) : preview.row.kind === "pdf" ? (
-              <iframe
-                src={preview.url}
-                title={preview.row.filename}
-                className="h-full w-full rounded-lg border border-white/20 bg-white"
-              />
-            ) : (
-              <div className="rounded-lg bg-white px-6 py-5 text-sm text-slate-700">
-                Este tipo de archivo no tiene vista previa. Usa &quot;Abrir
-                en pestaña&quot;.
-              </div>
-            )}
-          </div>
-        </div>
       ) : null}
     </div>
   );
