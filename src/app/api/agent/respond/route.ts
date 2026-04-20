@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   if (historyError) return jsonError(historyError.message, 500);
 
-  const { data: userMessage, error: insertUserError } = await supabase
+  const { data: userMessageRaw, error: insertUserError } = await supabase
     .from("messages")
     .insert({
       case_id: caseId,
@@ -102,12 +102,52 @@ export async function POST(request: NextRequest) {
     .select("id, case_id, author, content, mode_used, created_at")
     .single();
 
-  if (insertUserError || !userMessage) {
+  if (insertUserError || !userMessageRaw) {
     return jsonError(
       insertUserError?.message ?? "No se pudo guardar tu mensaje.",
       500,
     );
   }
+
+  const linkedAttachmentIds: string[] = [];
+  if (attachmentIds.length > 0) {
+    const { data: validAttachments } = await supabase
+      .from("attachments")
+      .select("id")
+      .eq("case_id", caseId)
+      .in("id", attachmentIds)
+      .returns<{ id: string }[]>();
+
+    const validIds = new Set((validAttachments ?? []).map((r) => r.id));
+    const rows = attachmentIds
+      .filter((id) => validIds.has(id))
+      .map((id) => ({
+        message_id: userMessageRaw.id,
+        attachment_id: id,
+      }));
+
+    if (rows.length > 0) {
+      const { error: linkError } = await supabase
+        .from("message_attachments")
+        .insert(rows);
+
+      if (linkError) {
+        // El mensaje ya está guardado, no abortamos el turno por un
+        // fallo en el link. Se loguea y el agente sigue.
+        console.error(
+          "No se pudieron vincular adjuntos al mensaje",
+          linkError,
+        );
+      } else {
+        linkedAttachmentIds.push(...rows.map((r) => r.attachment_id));
+      }
+    }
+  }
+
+  const userMessage = {
+    ...userMessageRaw,
+    attachment_ids: linkedAttachmentIds,
+  };
 
   let userContentBlocks;
   try {
@@ -159,7 +199,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: agentMessage, error: insertAgentError } = await supabase
+  const { data: agentMessageRaw, error: insertAgentError } = await supabase
     .from("messages")
     .insert({
       case_id: caseId,
@@ -173,7 +213,7 @@ export async function POST(request: NextRequest) {
     .select("id, case_id, author, content, mode_used, created_at")
     .single();
 
-  if (insertAgentError || !agentMessage) {
+  if (insertAgentError || !agentMessageRaw) {
     return NextResponse.json(
       {
         error:
@@ -184,6 +224,11 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  const agentMessage = {
+    ...agentMessageRaw,
+    attachment_ids: [] as string[],
+  };
 
   return NextResponse.json({ userMessage, agentMessage });
 }
