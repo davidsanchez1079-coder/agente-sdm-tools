@@ -70,6 +70,23 @@ function describeFabricante(marcaPreferida: string | null) {
   return match?.label ?? marcaPreferida;
 }
 
+const MESSAGE_TIME_FORMAT = new Intl.DateTimeFormat("es-MX", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+function formatMessageTime(iso: string): string {
+  try {
+    return MESSAGE_TIME_FORMAT.format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 const CASE_COLUMNS =
   "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, created_at";
 
@@ -502,25 +519,38 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         </div>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         {messages.length ? (
           [...messages].reverse().map((entry) => (
             <article
               key={entry.id}
-              className={`rounded-xl border p-4 shadow-sm dark:shadow-none ${
+              className={`rounded-xl border px-3.5 py-3 shadow-sm dark:shadow-none ${
                 entry.author === "user"
                   ? "border-emerald-500/40 bg-emerald-50/80 dark:border-emerald-400/30 dark:bg-emerald-500/5"
                   : "border-cyan-500/40 bg-cyan-50/80 dark:border-cyan-400/30 dark:bg-cyan-500/5"
               }`}
             >
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                {entry.author === "user"
-                  ? "Usuario"
-                  : `Agente · ${entry.mode_used}`}
-              </p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-900 dark:text-slate-100">
-                {entry.content}
-              </p>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                  {entry.author === "user"
+                    ? "Usuario"
+                    : `Agente · ${entry.mode_used}`}
+                </p>
+                <time
+                  dateTime={entry.created_at}
+                  className="text-[10px] font-medium tabular-nums text-slate-500 dark:text-slate-400"
+                >
+                  {formatMessageTime(entry.created_at)}
+                </time>
+              </div>
+              <div className="mt-1.5 space-y-1.5 text-sm leading-6 text-slate-900 dark:text-slate-100 [&_p]:whitespace-pre-wrap [&_p]:break-words">
+                {entry.content
+                  .split(/\n{2,}/)
+                  .filter((chunk) => chunk.trim().length > 0)
+                  .map((chunk, index) => (
+                    <p key={index}>{chunk}</p>
+                  ))}
+              </div>
             </article>
           ))
         ) : (

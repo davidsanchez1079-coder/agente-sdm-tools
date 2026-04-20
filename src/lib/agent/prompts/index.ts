@@ -53,6 +53,17 @@ function buildModeBlock(mode: BrandId): string {
  * Este contrato se respeta tanto en la biblioteca interna como en la
  * lectura de adjuntos (p.ej. si el caso tiene 10 PDFs y la pregunta es
  * sobre uno, no se inyectan los otros 9).
+ *
+ * VALIDACIÓN DE CÓDIGOS ESPECÍFICOS (capacidad futura, no implementada):
+ *
+ * Cuando el sistema tenga validación en vivo de códigos contra librería
+ * interna o contra catálogos/páginas oficiales de cada marca, el
+ * orchestrator recibirá aquí los códigos ya validados con su fuente y
+ * su link oficial. Con esa información inyectada, el agente podrá
+ * afirmar el código y compartir el enlace oficial para que el vendedor
+ * lo abra en planta. Sin ese pipe de validación, la REGLA DURA de
+ * BASE_RULES sigue vigente: el agente no afirma códigos desde memoria
+ * y no inventa enlaces.
  */
 export type BuildSystemBlocksOptions = {
   // Fuente 1 (prioridad máxima): catálogo técnico propio de la marca.
