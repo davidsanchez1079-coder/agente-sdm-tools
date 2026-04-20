@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { createMessage, listMessages } from "@/lib/workspace/messages";
+import { listMessages } from "@/lib/workspace/messages";
 import { updateCase, type CaseRow } from "@/lib/workspace/folders";
-import { buildGeneralAgentResponse } from "@/lib/agent/general-response";
-import { buildSpecialistAgentResponse } from "@/lib/agent/specialist-response";
-import { BRANDS, type BrandId } from "@/lib/brands/brands";
+import {
+  BRANDS,
+  ENABLED_AGENT_MODES,
+  type BrandId,
+} from "@/lib/brands/brands";
 import {
   CASE_ESTADOS,
   CASE_PRIORIDADES,
@@ -51,7 +53,11 @@ function deriveAgentMode(marcaPreferida: string | null): BrandId {
     (brand) =>
       brand.id === normalized || brand.label.toLowerCase() === normalized,
   );
-  return match?.id ?? "general";
+  const derived: BrandId = match?.id ?? "general";
+  // En v1 solo "general" está habilitado. Si el caso trae fabricante cuyo
+  // modo especialista aún no existe, caemos a general para no auto-seleccionar
+  // una opción deshabilitada del dropdown.
+  return ENABLED_AGENT_MODES.includes(derived) ? derived : "general";
 }
 
 function describeFabricante(marcaPreferida: string | null) {
@@ -307,54 +313,47 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       const supabase = getSupabaseBrowserClient();
       const text = chatInput.trim();
 
-      const userMessage = await createMessage(
-        supabase,
-        caseItem.id,
-        "user",
-        text,
-      );
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error("Sesión expirada. Vuelve a iniciar sesión.");
+      }
 
-      const history = messages.map((entry) => ({
-        author: entry.author,
-        content: entry.content,
-      }));
+      const response = await fetch("/api/agent/respond", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          caseId: caseItem.id,
+          content: text,
+          mode: agentMode,
+        }),
+      });
 
-      const agentContent =
-        agentMode === "general"
-          ? buildGeneralAgentResponse({
-              caseTitle: caseItem.titulo,
-              client: caseItem.cliente,
-              message: text,
-              operacion: caseItem.operacion,
-              material: caseItem.material,
-              maquina: caseItem.maquina,
-              marcaPreferida: caseItem.marca_preferida,
-              history,
-            })
-          : buildSpecialistAgentResponse({
-              caseTitle: caseItem.titulo,
-              client: caseItem.cliente,
-              message: text,
-              operacion: caseItem.operacion,
-              material: caseItem.material,
-              maquina: caseItem.maquina,
-              marcaPreferida: caseItem.marca_preferida,
-              history,
-              mode: agentMode,
-            });
+      const payload = (await response.json().catch(() => ({}))) as {
+        userMessage?: MessageRow;
+        agentMessage?: MessageRow;
+        error?: string;
+      };
 
-      const agentMessage = await createMessage(
-        supabase,
-        caseItem.id,
-        "agent",
-        agentContent,
-        agentMode,
-      );
+      if (!response.ok) {
+        if (payload.userMessage) {
+          setMessages((prev) => [...prev, payload.userMessage as MessageRow]);
+          setChatInput("");
+        }
+        throw new Error(payload.error ?? "Error al llamar al agente.");
+      }
+
+      if (!payload.userMessage || !payload.agentMessage) {
+        throw new Error("Respuesta inválida del servidor.");
+      }
 
       setMessages((prev) => [
         ...prev,
-        userMessage as MessageRow,
-        agentMessage as MessageRow,
+        payload.userMessage as MessageRow,
+        payload.agentMessage as MessageRow,
       ]);
       setChatInput("");
       setMessage("Mensaje guardado.");
