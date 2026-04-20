@@ -81,11 +81,13 @@ create table public.messages (
 create table public.attachments (
   id uuid primary key default gen_random_uuid(),
   case_id uuid not null references public.cases(id) on delete cascade,
-  file_url text not null,
-  file_type text not null check (file_type in ('image','pdf','other')),
+  storage_path text not null,
   filename text not null,
+  kind text not null check (kind in ('image','pdf','other')),
+  mime_type text,
   size_bytes bigint,
   analyzed_by_ai boolean not null default false,
+  analysis_notes text,
   user_prompt text,
   created_at timestamptz not null default now()
 );
