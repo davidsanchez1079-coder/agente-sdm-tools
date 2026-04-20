@@ -17,13 +17,21 @@ function describeFabricante(marcaPreferida: string | null): string {
   return match?.label ?? marcaPreferida;
 }
 
+function buildOperacionLine(operacion: string | null): string {
+  const trimmed = operacion?.trim();
+  if (trimmed) {
+    return `Operación (anclaje principal): ${trimmed}. Usa esta operación como línea principal de tu análisis; todo lo demás del caso se interpreta a su luz.`;
+  }
+  return "Operación (anclaje principal): SIN DEFINIR. Antes de cerrar una recomendación específica, señala puntualmente al usuario que hace falta precisar la operación y pídele que la aclare. Puedes ofrecer un análisis preliminar general, pero no inventes una operación por defecto.";
+}
+
 export function buildCaseContext(caseRow: CaseRow): string {
   const lines = [
     "CONTEXTO DEL CASO",
+    buildOperacionLine(caseRow.operacion),
     `Título: ${caseRow.titulo}`,
     `Cliente: ${caseRow.cliente ?? "sin asignar"}`,
     `Fabricante preferido: ${describeFabricante(caseRow.marca_preferida)}`,
-    `Operación: ${caseRow.operacion ?? "sin asignar"}`,
     `Material: ${caseRow.material ?? "sin asignar"}`,
     `Máquina: ${caseRow.maquina ?? "sin asignar"}`,
     `Estado: ${estadoLabel(caseRow.estado)}`,
