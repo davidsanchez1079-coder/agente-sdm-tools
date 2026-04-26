@@ -13,11 +13,13 @@ export type CustomerRow = {
   estatus: CustomerEstatus;
   notas: string | null;
   potencial_mensual_usd: number | null;
+  created_by: string | null;
+  secondary_agente_id: string | null;
   created_at: string;
 };
 
 const CUSTOMER_COLUMNS =
-  "id, workspace_id, label, estado, ciudad, segmento, estatus, notas, potencial_mensual_usd, created_at";
+  "id, workspace_id, label, estado, ciudad, segmento, estatus, notas, potencial_mensual_usd, created_by, secondary_agente_id, created_at";
 
 export async function listCustomers(
   supabase: SupabaseClient,
@@ -54,6 +56,7 @@ export type CreateCustomerInput = {
   estatus?: CustomerEstatus;
   notas?: string | null;
   potencialMensualUsd?: number | null;
+  secondaryAgenteId?: string | null;
 };
 
 export async function createCustomer(
@@ -72,6 +75,7 @@ export async function createCustomer(
       estatus: input.estatus ?? "activo",
       notas: input.notas?.trim() || null,
       potencial_mensual_usd: input.potencialMensualUsd ?? null,
+      secondary_agente_id: input.secondaryAgenteId ?? null,
     })
     .select(CUSTOMER_COLUMNS)
     .single<CustomerRow>();
@@ -129,6 +133,7 @@ export type UpdateCustomerPatch = Partial<{
   estatus: CustomerEstatus;
   notas: string | null;
   potencial_mensual_usd: number | null;
+  secondary_agente_id: string | null;
 }>;
 
 export async function updateCustomer(

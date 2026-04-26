@@ -31,11 +31,13 @@ export type CaseRow = {
   resultado_cierre: CaseResultadoCierre | null;
   requiere_rap: boolean;
   potencial_usd: number | null;
+  created_by: string | null;
+  secondary_agente_id: string | null;
   created_at: string;
 };
 
 export const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion_tipo, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_at";
+  "id, folder_id, titulo, cliente, operacion_tipo, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_by, secondary_agente_id, created_at";
 
 export async function listFolders(supabase: SupabaseClient, workspaceId: string) {
   const { data, error } = await supabase
@@ -155,6 +157,7 @@ export type CreateCaseInput = {
   maquina?: string;
   marcaPreferida?: string;
   prioridad?: CasePrioridad;
+  secondaryAgenteId?: string | null;
 };
 
 // Crea un caso asociado a un cliente. La UX customer-first invoca este
@@ -192,6 +195,7 @@ export async function createCase(
       marca_preferida: input.marcaPreferida || null,
       estado: "abierto",
       prioridad: input.prioridad ?? "media",
+      secondary_agente_id: input.secondaryAgenteId ?? null,
     })
     .select(CASE_COLUMNS)
     .single<CaseRow>();
@@ -210,6 +214,7 @@ export type UpdateCasePatch = Partial<{
   resultado_cierre: CaseResultadoCierre | null;
   requiere_rap: boolean;
   potencial_usd: number | null;
+  secondary_agente_id: string | null;
 }>;
 
 export async function updateCase(

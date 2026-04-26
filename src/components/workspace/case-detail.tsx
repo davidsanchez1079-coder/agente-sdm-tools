@@ -14,6 +14,11 @@ import {
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  agenteFullName,
+  listAgentes,
+  type AgenteRow,
+} from "@/lib/agentes/agentes-db";
+import {
   BRANDS,
   ENABLED_AGENT_MODES,
   type BrandId,
@@ -109,6 +114,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingCase, setDeletingCase] = useState(false);
+  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
+  const [savingSecondary, setSavingSecondary] = useState(false);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -173,13 +180,33 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
         setSelectedAttachmentIds([]);
 
-        const [msgs, atts] = await Promise.all([
+        // Resuelve workspace_id del caso para listar agentes asignables
+        // del workspace correcto. Pasa por folders ya que cases.folder_id
+        // → folders.workspace_id.
+        const [msgs, atts, folderRes] = await Promise.all([
           listMessages(supabase, caseId),
           listAttachments(supabase, caseId),
+          supabase
+            .from("folders")
+            .select("workspace_id")
+            .eq("id", caseData.folder_id)
+            .maybeSingle<{ workspace_id: string }>(),
         ]);
         if (!cancelled) {
           setMessages(msgs);
           setAttachments(atts);
+          if (folderRes.data?.workspace_id) {
+            try {
+              const list = await listAgentes(
+                supabase,
+                folderRes.data.workspace_id,
+                { onlyActive: true },
+              );
+              if (!cancelled) setAgentes(list);
+            } catch {
+              // Silencioso: si falla, el selector queda vacío.
+            }
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -462,6 +489,30 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } finally {
       setSavingOperacion(false);
+    }
+  }
+
+  async function handleChangeSecondaryAgente(value: string) {
+    if (!caseItem) return;
+    const next = value || null;
+    if ((caseItem.secondary_agente_id ?? null) === next) return;
+    setSavingSecondary(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        secondary_agente_id: next,
+      });
+      setCaseItem(updated);
+      setMessage("Agente secundario actualizado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el agente secundario.",
+      );
+    } finally {
+      setSavingSecondary(false);
     }
   }
 
@@ -1011,7 +1062,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       </div>
 
       <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="grid gap-1.5 text-sm">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
               Estado
@@ -1049,6 +1100,28 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
               {CASE_PRIORIDADES.map((row) => (
                 <option key={row.id} value={row.id}>
                   {row.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Agente secundario
+            </span>
+            <select
+              className={controlClass}
+              value={caseItem.secondary_agente_id ?? ""}
+              onChange={(event) =>
+                void handleChangeSecondaryAgente(event.target.value)
+              }
+              disabled={savingSecondary}
+            >
+              <option value="">Sin asignar</option>
+              {agentes.map((agente) => (
+                <option key={agente.id} value={agente.id}>
+                  {agenteFullName(agente)}
+                  {agente.rol_label ? ` — ${agente.rol_label}` : ""}
                 </option>
               ))}
             </select>

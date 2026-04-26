@@ -34,6 +34,9 @@ export type CaseFilters = {
   // case-sensitive en URL (ej. ?cliente=Magna,PCNC). Comparación contra
   // row.cliente es case-insensitive.
   clientes: string[];
+  // IDs (uuid) de agentes secundarios. Filtra casos donde
+  // cases.secondary_agente_id está en la lista. Vacío = no filtrar.
+  agentes: string[];
   fabricantes: BrandId[];
   rap: RapFilter;
   sort: SortKey;
@@ -51,6 +54,7 @@ export const EMPTY_FILTERS: CaseFilters = {
   estados: [],
   prioridades: [],
   clientes: [],
+  agentes: [],
   fabricantes: [],
   rap: "all",
   sort: "recent",
@@ -79,6 +83,7 @@ export function parseFiltersFromParams(
   // real ocurre en case-filters.tsx donde se comparan contra customers
   // cargados de BD.
   const clientes = splitList(params.get("cliente"));
+  const agentes = splitList(params.get("agente"));
   const fabricantes = splitList(params.get("fabricante")).filter(
     (value): value is BrandId =>
       VALID_BRAND_IDS.includes(value as BrandId),
@@ -99,6 +104,7 @@ export function parseFiltersFromParams(
     estados,
     prioridades,
     clientes,
+    agentes,
     fabricantes,
     rap,
     sort,
@@ -125,6 +131,10 @@ export function serializeFiltersToParams(
     params.set("cliente", filters.clientes.join(","));
   else params.delete("cliente");
 
+  if (filters.agentes.length)
+    params.set("agente", filters.agentes.join(","));
+  else params.delete("agente");
+
   if (filters.fabricantes.length)
     params.set("fabricante", filters.fabricantes.join(","));
   else params.delete("fabricante");
@@ -143,6 +153,7 @@ export function countActivePanelFilters(filters: CaseFilters): number {
     filters.estados.length +
     filters.prioridades.length +
     filters.clientes.length +
+    filters.agentes.length +
     filters.fabricantes.length +
     (filters.rap !== "all" ? 1 : 0)
   );
@@ -191,6 +202,8 @@ export function applyFilters(
     filters.clientes.map((label) => label.trim().toLowerCase()),
   );
 
+  const agenteIdsSet = new Set(filters.agentes);
+
   return rows.filter((row) => {
     if (filters.estados.length && !filters.estados.includes(row.estado))
       return false;
@@ -203,6 +216,10 @@ export function applyFilters(
       if (!row.cliente) return false;
       if (!clienteLabelsLower.has(row.cliente.trim().toLowerCase()))
         return false;
+    }
+    if (agenteIdsSet.size > 0) {
+      if (!row.secondary_agente_id) return false;
+      if (!agenteIdsSet.has(row.secondary_agente_id)) return false;
     }
     if (
       filters.fabricantes.length &&

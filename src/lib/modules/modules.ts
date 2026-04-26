@@ -3,6 +3,7 @@ export type ModuleId =
   | "usuario"
   | "customers"
   | "caso"
+  | "agentes"
   | "brands";
 
 export type ModuleMeta = {
@@ -37,6 +38,12 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     href: "/app/caso",
     kicker: "Caso",
   },
+  agentes: {
+    id: "agentes",
+    label: "Agentes",
+    href: "/app/agentes",
+    kicker: "Agentes",
+  },
   brands: {
     id: "brands",
     label: "Fabricante/Marca",
@@ -53,6 +60,8 @@ export const MODULE_CHIP: Record<ModuleId, string> = {
   customers:
     "border-cyan-500/40 bg-cyan-50 text-cyan-700 dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200",
   caso: "border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200",
+  agentes:
+    "border-teal-500/40 bg-teal-50 text-teal-700 dark:border-teal-400/40 dark:bg-teal-500/15 dark:text-teal-200",
   brands:
     "border-amber-500/40 bg-amber-50 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200",
 };
@@ -65,6 +74,8 @@ export const MODULE_ICON_BG: Record<ModuleId, string> = {
   customers:
     "bg-cyan-50 text-cyan-600 ring-1 ring-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-400/30",
   caso: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30",
+  agentes:
+    "bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-400/30",
   brands:
     "bg-amber-50 text-amber-700 ring-1 ring-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30",
 };
@@ -74,6 +85,7 @@ export const MODULE_BAR: Record<ModuleId, string> = {
   usuario: "before:bg-violet-500 dark:before:bg-violet-400",
   customers: "before:bg-cyan-500 dark:before:bg-cyan-400",
   caso: "before:bg-emerald-500 dark:before:bg-emerald-400",
+  agentes: "before:bg-teal-500 dark:before:bg-teal-400",
   brands: "before:bg-amber-500 dark:before:bg-amber-400",
 };
 
@@ -82,6 +94,7 @@ export const MODULE_HOVER_RING: Record<ModuleId, string> = {
   usuario: "hover:ring-violet-500/40 dark:hover:ring-violet-400/40",
   customers: "hover:ring-cyan-500/40 dark:hover:ring-cyan-400/40",
   caso: "hover:ring-emerald-500/40 dark:hover:ring-emerald-400/40",
+  agentes: "hover:ring-teal-500/40 dark:hover:ring-teal-400/40",
   brands: "hover:ring-amber-500/40 dark:hover:ring-amber-400/40",
 };
 
@@ -93,6 +106,8 @@ export const MODULE_ARROW: Record<ModuleId, string> = {
   customers:
     "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-300 dark:group-hover:text-cyan-200",
   caso: "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300 dark:group-hover:text-emerald-200",
+  agentes:
+    "text-teal-600 group-hover:text-teal-700 dark:text-teal-300 dark:group-hover:text-teal-200",
   brands:
     "text-amber-700 group-hover:text-amber-800 dark:text-amber-300 dark:group-hover:text-amber-200",
 };
@@ -105,6 +120,8 @@ export const MODULE_ACTIVE_NAV: Record<ModuleId, string> = {
   customers:
     "border-cyan-500/30 bg-cyan-50 text-cyan-800 shadow-[inset_3px_0_0_0_rgb(6_182_212)] dark:border-cyan-400/30 dark:bg-cyan-500/10 dark:text-cyan-100 dark:shadow-[inset_3px_0_0_0_rgb(34_211_238)]",
   caso: "border-emerald-500/30 bg-emerald-50 text-emerald-800 shadow-[inset_3px_0_0_0_rgb(16_185_129)] dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100 dark:shadow-[inset_3px_0_0_0_rgb(52_211_153)]",
+  agentes:
+    "border-teal-500/30 bg-teal-50 text-teal-800 shadow-[inset_3px_0_0_0_rgb(20_184_166)] dark:border-teal-400/30 dark:bg-teal-500/10 dark:text-teal-100 dark:shadow-[inset_3px_0_0_0_rgb(45_212_191)]",
   brands:
     "border-amber-500/30 bg-amber-50 text-amber-800 shadow-[inset_3px_0_0_0_rgb(245_158_11)] dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100 dark:shadow-[inset_3px_0_0_0_rgb(251_191_36)]",
 };
@@ -114,6 +131,7 @@ export function moduleIdFromPath(pathname: string): ModuleId {
   if (pathname.startsWith("/app/usuario")) return "usuario";
   if (pathname.startsWith("/app/customers")) return "customers";
   if (pathname.startsWith("/app/caso")) return "caso";
+  if (pathname.startsWith("/app/agentes")) return "agentes";
   if (pathname.startsWith("/app/brands")) return "brands";
   return "dashboard";
 }

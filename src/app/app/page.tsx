@@ -27,6 +27,11 @@ const TILES: {
     description: "Catálogo base de clientes y casos asociados.",
   },
   {
+    id: "agentes",
+    description:
+      "Personas asignables a clientes y casos como agente involucrado (técnico, apoyo comercial, otro responsable).",
+  },
+  {
     id: "brands",
     description:
       "Catálogo de fabricantes. El fabricante del caso activa el modo Especialista del agente.",

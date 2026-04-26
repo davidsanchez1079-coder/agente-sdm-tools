@@ -49,6 +49,15 @@ export function ModuleIcon({ id, className = "h-5 w-5" }: ModuleIconProps) {
           <path d="M3 6.2A1.2 1.2 0 0 1 4.2 5h3.3a1 1 0 0 1 .7.29L9.5 6.5h6.3A1.2 1.2 0 0 1 17 7.7V15a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15V6.2z" />
         </svg>
       );
+    case "agentes":
+      return (
+        <svg {...base}>
+          <circle cx="7" cy="7" r="2.5" />
+          <circle cx="14" cy="8" r="2" />
+          <path d="M2 17c0-2.5 2.2-4 5-4s5 1.5 5 4" />
+          <path d="M11 16.5c0-2 1.5-3 3-3s3 1 3 3" />
+        </svg>
+      );
     case "brands":
       return (
         <svg {...base}>
