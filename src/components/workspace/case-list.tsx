@@ -12,6 +12,8 @@ import {
 import {
   estadoBadge,
   estadoLabel,
+  operacionTipoBadge,
+  operacionTipoLabel,
   prioridadBadge,
   prioridadLabel,
 } from "@/lib/cases/cases";
@@ -155,6 +157,13 @@ export function CaseList({
                 >
                   {prioridadLabel(row.prioridad)}
                 </span>
+                {row.operacion_tipo ? (
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${operacionTipoBadge(row.operacion_tipo)}`}
+                  >
+                    {operacionTipoLabel(row.operacion_tipo)}
+                  </span>
+                ) : null}
                 {row.requiere_rap ? (
                   <span className="rounded-full border border-violet-500/40 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200">
                     RAP

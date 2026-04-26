@@ -13,12 +13,19 @@ import {
   MODULE_ICON_BG,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
-import { estadoBadge, estadoLabel } from "@/lib/cases/cases";
+import {
+  estadoBadge,
+  estadoLabel,
+  operacionTipoBadge,
+  operacionTipoLabel,
+  type CaseOperacionTipo,
+} from "@/lib/cases/cases";
 
 type CaseRow = {
   id: string;
   titulo: string;
   estado: string;
+  operacion_tipo: CaseOperacionTipo | null;
   operacion: string | null;
   material: string | null;
   created_at: string;
@@ -51,7 +58,9 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
         const supabase = getSupabaseBrowserClient();
         const { data, error } = await supabase
           .from("cases")
-          .select("id, titulo, estado, operacion, material, created_at")
+          .select(
+            "id, titulo, estado, operacion_tipo, operacion, material, created_at",
+          )
           .eq("cliente", customer.label)
           .order("created_at", { ascending: false });
         if (error) throw error;
@@ -160,11 +169,20 @@ export function CustomerDetail({ customer }: CustomerDetailProps) {
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                       {row.titulo}
                     </p>
-                    <span
-                      className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${estadoBadge(row.estado)}`}
-                    >
-                      {estadoLabel(row.estado)}
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${estadoBadge(row.estado)}`}
+                      >
+                        {estadoLabel(row.estado)}
+                      </span>
+                      {row.operacion_tipo ? (
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${operacionTipoBadge(row.operacion_tipo)}`}
+                        >
+                          {operacionTipoLabel(row.operacion_tipo)}
+                        </span>
+                      ) : null}
+                    </div>
                     {row.operacion ? (
                       <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                         Operación: {row.operacion}

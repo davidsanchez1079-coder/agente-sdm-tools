@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { listMessages, type MessageRow } from "@/lib/workspace/messages";
-import { updateCase, type CaseRow } from "@/lib/workspace/folders";
+import {
+  CASE_COLUMNS,
+  updateCase,
+  type CaseRow,
+} from "@/lib/workspace/folders";
 import {
   BRANDS,
   ENABLED_AGENT_MODES,
@@ -13,16 +17,20 @@ import {
 } from "@/lib/brands/brands";
 import {
   CASE_ESTADOS,
+  CASE_OPERACION_TIPOS,
   CASE_PRIORIDADES,
   CASE_RESULTADOS_CIERRE,
   estadoBadge,
   estadoLabel,
   formatPotencialUsd,
+  operacionTipoBadge,
+  operacionTipoLabel,
   prioridadBadge,
   prioridadLabel,
   resultadoCierreBadge,
   resultadoCierreLabel,
   type CaseEstado,
+  type CaseOperacionTipo,
   type CasePrioridad,
   type CaseResultadoCierre,
 } from "@/lib/cases/cases";
@@ -93,9 +101,6 @@ function formatMessageTime(iso: string): string {
   }
 }
 
-const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, created_at";
-
 export function CaseDetail({ caseId }: CaseDetailProps) {
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
@@ -109,6 +114,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [resumenDraft, setResumenDraft] = useState("");
   const [siguienteDraft, setSiguienteDraft] = useState("");
   const [potencialDraft, setPotencialDraft] = useState("");
+  const [operacionDraft, setOperacionDraft] = useState("");
   const [savingResumen, setSavingResumen] = useState(false);
   const [savingSiguiente, setSavingSiguiente] = useState(false);
   const [savingEstado, setSavingEstado] = useState(false);
@@ -116,6 +122,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [savingResultado, setSavingResultado] = useState(false);
   const [savingRap, setSavingRap] = useState(false);
   const [savingPotencial, setSavingPotencial] = useState(false);
+  const [savingOperacionTipo, setSavingOperacionTipo] = useState(false);
+  const [savingOperacion, setSavingOperacion] = useState(false);
 
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<
@@ -155,6 +163,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             ? String(caseData.potencial_usd)
             : "",
         );
+        setOperacionDraft(caseData.operacion ?? "");
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
         setSelectedAttachmentIds([]);
 
@@ -400,6 +409,56 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     }
   }
 
+  async function handleChangeOperacionTipo(
+    tipo: CaseOperacionTipo | null,
+  ) {
+    if (!caseItem || (caseItem.operacion_tipo ?? null) === tipo) return;
+    setSavingOperacionTipo(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        operacion_tipo: tipo,
+      });
+      setCaseItem(updated);
+      setMessage("Tipo de operación actualizado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el tipo de operación.",
+      );
+    } finally {
+      setSavingOperacionTipo(false);
+    }
+  }
+
+  async function handleSaveOperacion() {
+    if (!caseItem) return;
+    const next = operacionDraft.trim();
+    const current = caseItem.operacion ?? "";
+    if (next === current) return;
+    setSavingOperacion(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        operacion: next === "" ? null : next,
+      });
+      setCaseItem(updated);
+      setOperacionDraft(updated.operacion ?? "");
+      setMessage("Detalle de operación guardado.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar el detalle de operación.",
+      );
+    } finally {
+      setSavingOperacion(false);
+    }
+  }
+
   async function handleChangeRap(requiereRap: boolean) {
     if (!caseItem || caseItem.requiere_rap === requiereRap) return;
     setSavingRap(true);
@@ -537,6 +596,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     siguienteDraft.trim() !== "";
   const siguienteErased =
     (caseItem.siguiente_accion ?? "") !== "" && siguienteDraft.trim() === "";
+  const operacionDirty =
+    (caseItem.operacion ?? "") !== operacionDraft.trim() &&
+    operacionDraft.trim() !== "";
+  const operacionErased =
+    (caseItem.operacion ?? "") !== "" && operacionDraft.trim() === "";
 
   const controlClass =
     "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20";
@@ -579,6 +643,13 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           >
             Prioridad {prioridadLabel(caseItem.prioridad)}
           </span>
+          {caseItem.operacion_tipo ? (
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${operacionTipoBadge(caseItem.operacion_tipo)}`}
+            >
+              {operacionTipoLabel(caseItem.operacion_tipo)}
+            </span>
+          ) : null}
           {caseItem.cliente ? (
             <span className="rounded-full border border-cyan-500/40 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-800 dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200">
               {caseItem.cliente}
@@ -963,6 +1034,72 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Operación
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Tipo cerrado para clasificar el caso. Detalle libre opcional.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Tipo
+            </span>
+            <select
+              className={controlClass}
+              value={caseItem.operacion_tipo ?? ""}
+              onChange={(event) =>
+                void handleChangeOperacionTipo(
+                  event.target.value === ""
+                    ? null
+                    : (event.target.value as CaseOperacionTipo),
+                )
+              }
+              disabled={savingOperacionTipo}
+            >
+              <option value="">Sin asignar</option>
+              {CASE_OPERACION_TIPOS.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Detalle
+            </span>
+            <input
+              className={controlClass}
+              value={operacionDraft}
+              onChange={(event) => setOperacionDraft(event.target.value)}
+              placeholder="Ej. torneado externo de barra Ø20"
+              disabled={savingOperacion}
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSaveOperacion()}
+            disabled={
+              savingOperacion || (!operacionDirty && !operacionErased)
+            }
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-emerald-300"
+          >
+            {savingOperacion ? "Guardando…" : "Guardar detalle"}
+          </button>
+          {operacionDirty || operacionErased ? (
+            <span className="text-xs text-amber-600 dark:text-amber-300">
+              Sin guardar
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
             Potencial (USD)
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1169,7 +1306,16 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           />
           <InfoTile
             label="Operación"
-            value={caseItem.operacion ?? "Sin asignar"}
+            value={
+              [
+                caseItem.operacion_tipo
+                  ? operacionTipoLabel(caseItem.operacion_tipo)
+                  : null,
+                caseItem.operacion,
+              ]
+                .filter(Boolean)
+                .join(" — ") || "Sin asignar"
+            }
           />
           <InfoTile
             label="Material"

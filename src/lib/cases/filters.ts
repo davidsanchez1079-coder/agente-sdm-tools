@@ -1,6 +1,7 @@
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import { CUSTOMERS, type CustomerId } from "@/lib/customers/customers";
 import type { CaseRow } from "@/lib/workspace/folders";
+import { operacionTipoLabel } from "./cases";
 import type { CaseEstado, CasePrioridad } from "./cases";
 
 const VALID_ESTADOS: CaseEstado[] = [
@@ -156,6 +157,7 @@ function matchesSearch(row: CaseRow, q: string): boolean {
   const fields: (string | null)[] = [
     row.titulo,
     row.cliente,
+    row.operacion_tipo ? operacionTipoLabel(row.operacion_tipo) : null,
     row.operacion,
     row.material,
     row.maquina,

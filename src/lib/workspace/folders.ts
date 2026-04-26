@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CaseEstado,
+  CaseOperacionTipo,
   CasePrioridad,
   CaseResultadoCierre,
 } from "@/lib/cases/cases";
@@ -18,6 +19,7 @@ export type CaseRow = {
   folder_id: string;
   titulo: string;
   cliente: string | null;
+  operacion_tipo: CaseOperacionTipo | null;
   operacion: string | null;
   material: string | null;
   maquina: string | null;
@@ -32,8 +34,8 @@ export type CaseRow = {
   created_at: string;
 };
 
-const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_at";
+export const CASE_COLUMNS =
+  "id, folder_id, titulo, cliente, operacion_tipo, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_at";
 
 export async function listFolders(supabase: SupabaseClient, workspaceId: string) {
   const { data, error } = await supabase
@@ -87,6 +89,7 @@ export async function listCases(supabase: SupabaseClient, folderId: string) {
 export type CreateCaseInput = {
   titulo: string;
   cliente?: string;
+  operacionTipo?: CaseOperacionTipo;
   operacion?: string;
   material?: string;
   maquina?: string;
@@ -105,6 +108,7 @@ export async function createCase(
       folder_id: folderId,
       titulo: input.titulo,
       cliente: input.cliente || null,
+      operacion_tipo: input.operacionTipo ?? null,
       operacion: input.operacion || null,
       material: input.material || null,
       maquina: input.maquina || null,
@@ -122,6 +126,8 @@ export async function createCase(
 export type UpdateCasePatch = Partial<{
   estado: CaseEstado;
   prioridad: CasePrioridad;
+  operacion_tipo: CaseOperacionTipo | null;
+  operacion: string | null;
   siguiente_accion: string | null;
   resumen_ejecutivo: string | null;
   resultado_cierre: CaseResultadoCierre | null;

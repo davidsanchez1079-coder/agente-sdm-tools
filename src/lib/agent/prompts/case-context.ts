@@ -3,8 +3,10 @@ import { BRANDS } from "@/lib/brands/brands";
 import {
   estadoLabel,
   formatPotencialUsd,
+  operacionTipoLabel,
   prioridadLabel,
   resultadoCierreLabel,
+  type CaseOperacionTipo,
 } from "@/lib/cases/cases";
 
 function describeFabricante(marcaPreferida: string | null): string {
@@ -17,10 +19,20 @@ function describeFabricante(marcaPreferida: string | null): string {
   return match?.label ?? marcaPreferida;
 }
 
-function buildOperacionLine(operacion: string | null): string {
-  const trimmed = operacion?.trim();
-  if (trimmed) {
-    return `Operación (anclaje principal): ${trimmed}. Usa esta operación como línea principal de tu análisis; todo lo demás del caso se interpreta a su luz.`;
+function buildOperacionLine(
+  operacionTipo: CaseOperacionTipo | null,
+  operacion: string | null,
+): string {
+  const tipoLabel = operacionTipo ? operacionTipoLabel(operacionTipo) : null;
+  const detalle = operacion?.trim() || null;
+  if (tipoLabel && detalle) {
+    return `Operación (anclaje principal): ${tipoLabel} — ${detalle}. Usa el tipo como línea principal de tu análisis; el detalle libre matiza el caso. Todo lo demás se interpreta a su luz.`;
+  }
+  if (tipoLabel) {
+    return `Operación (anclaje principal): ${tipoLabel}. Usa esta operación como línea principal de tu análisis; todo lo demás del caso se interpreta a su luz.`;
+  }
+  if (detalle) {
+    return `Operación (anclaje principal): ${detalle} (tipo sin clasificar). Usa esta operación como línea principal de tu análisis; conviene que el vendedor clasifique el tipo para mayor precisión.`;
   }
   return "Operación (anclaje principal): SIN DEFINIR. Antes de cerrar una recomendación específica, señala puntualmente al usuario que hace falta precisar la operación y pídele que la aclare. Puedes ofrecer un análisis preliminar general, pero no inventes una operación por defecto.";
 }
@@ -28,7 +40,7 @@ function buildOperacionLine(operacion: string | null): string {
 export function buildCaseContext(caseRow: CaseRow): string {
   const lines = [
     "CONTEXTO DEL CASO",
-    buildOperacionLine(caseRow.operacion),
+    buildOperacionLine(caseRow.operacion_tipo, caseRow.operacion),
     `Título: ${caseRow.titulo}`,
     `Cliente: ${caseRow.cliente ?? "sin asignar"}`,
     `Fabricante preferido: ${describeFabricante(caseRow.marca_preferida)}`,
