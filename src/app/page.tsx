@@ -12,18 +12,23 @@ export default function Home() {
     <main className="min-h-screen bg-slate-950 text-slate-50">
       <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center gap-10 px-6 py-16 md:px-10">
         <div className="inline-flex w-fit rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-1 text-sm font-medium text-cyan-300">
-          Agente SDM Tools · fase 1
+          GOTIA · fase 1
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
           <div className="space-y-8">
             <div className="max-w-3xl space-y-6">
-              <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">
-                Agente IA especialista en mecanizado CNC para Amadeus y Sadama.
+              <h1 className="text-5xl font-semibold tracking-tight md:text-7xl">
+                GOTIA
               </h1>
+              <p className="text-xl leading-8 font-medium text-slate-100 md:text-2xl">
+                Gestión de Oportunidades y Soporte Técnico con Inteligencia
+                Artificial.
+              </p>
               <p className="text-lg leading-8 text-slate-300 md:text-xl">
-                Base inicial del proyecto web con Supabase ya preparado para autenticación,
-                crecimiento del workspace y conexión posterior al pipeline técnico.
+                Agente IA especialista en mecanizado CNC para Sadama y
+                Amadeus. Workspace de oportunidades, casos, agentes y
+                clientes, con conexión al pipeline técnico.
               </p>
             </div>
 

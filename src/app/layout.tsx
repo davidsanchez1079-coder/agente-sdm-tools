@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agente SDM Tools",
-  description: "Aplicación web PWA con agente IA especialista en mecanizado CNC para Amadeus y Sadama.",
+  title: "GOTIA",
+  description:
+    "GOTIA — Gestión de Oportunidades y Soporte Técnico con Inteligencia Artificial. Apoyo al equipo de Sadama y Amadeus en mecanizado CNC.",
 };
 
 export default function RootLayout({
