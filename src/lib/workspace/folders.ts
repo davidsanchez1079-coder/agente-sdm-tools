@@ -5,7 +5,6 @@ import type {
   CasePrioridad,
   CaseResultadoCierre,
 } from "@/lib/cases/cases";
-import { ensureCustomer } from "@/lib/customers/customers-db";
 
 type FolderRow = {
   id: string;
@@ -75,6 +74,66 @@ export async function deleteFolder(supabase: SupabaseClient, folderId: string) {
   if (error) throw error;
 }
 
+// Folder interno asociado a un cliente. La UX no muestra folders, pero
+// la BD los mantiene como organización técnica (cases.folder_id NOT NULL).
+// Este helper garantiza que cada cliente tenga su folder único, nombrado
+// igual que el cliente.
+export async function ensureFolderForCustomer(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  customerLabel: string,
+): Promise<string> {
+  const trimmed = customerLabel.trim();
+  if (!trimmed) {
+    throw new Error("customerLabel requerido para resolver folder.");
+  }
+
+  const { data: existing, error: selectError } = await supabase
+    .from("folders")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .ilike("nombre", trimmed)
+    .maybeSingle<{ id: string }>();
+
+  if (selectError) throw selectError;
+  if (existing?.id) return existing.id;
+
+  const { data: created, error: insertError } = await supabase
+    .from("folders")
+    .insert({ workspace_id: workspaceId, nombre: trimmed })
+    .select("id")
+    .single<{ id: string }>();
+
+  if (insertError) throw insertError;
+  return created.id;
+}
+
+// Lista cases visibles al usuario (RLS filtra al workspace) con filtro
+// opcional por cliente. Si customerLabel = null devuelve todos.
+// Si customerLabel = "" matchea casos con cliente IS NULL (pseudo
+// "Sin cliente").
+export async function listCasesByCustomer(
+  supabase: SupabaseClient,
+  customerLabel: string | null,
+) {
+  let query = supabase
+    .from("cases")
+    .select(CASE_COLUMNS)
+    .order("created_at", { ascending: false });
+
+  if (customerLabel === "") {
+    query = query.is("cliente", null);
+  } else if (customerLabel !== null) {
+    query = query.ilike("cliente", customerLabel);
+  }
+
+  const { data, error } = await query.returns<CaseRow[]>();
+  if (error) throw error;
+  return data;
+}
+
+// Legacy: lista por folder. Ya casi no se usa desde la UX customer-first
+// pero queda disponible para casos edge (admin, debugging, migración).
 export async function listCases(supabase: SupabaseClient, folderId: string) {
   const { data, error } = await supabase
     .from("cases")
@@ -89,7 +148,7 @@ export async function listCases(supabase: SupabaseClient, folderId: string) {
 
 export type CreateCaseInput = {
   titulo: string;
-  cliente?: string;
+  cliente: string;
   operacionTipo?: CaseOperacionTipo;
   operacion?: string;
   material?: string;
@@ -98,28 +157,34 @@ export type CreateCaseInput = {
   prioridad?: CasePrioridad;
 };
 
+// Crea un caso asociado a un cliente. La UX customer-first invoca este
+// helper desde dentro del detalle de un cliente, así que cliente es
+// requerido. El folder_id se deriva internamente del cliente
+// (1 folder por cliente, auto-creado si no existe).
 export async function createCase(
   supabase: SupabaseClient,
-  folderId: string,
   workspaceId: string,
   input: CreateCaseInput,
 ) {
-  const trimmedCliente = input.cliente?.trim() || null;
-
-  // Auto-add: si el caso menciona un cliente, garantizamos que exista
-  // en el catálogo del workspace antes de crear el caso. Idempotente
-  // vía unique index (workspace_id, lower(label)). Esto cubre cualquier
-  // flujo válido — form, importación, agente IA en el futuro.
-  if (trimmedCliente) {
-    await ensureCustomer(supabase, workspaceId, trimmedCliente);
+  const cliente = input.cliente.trim();
+  if (!cliente) {
+    throw new Error(
+      "Falta el cliente. Crea el caso desde el detalle de un cliente.",
+    );
   }
+
+  const folderId = await ensureFolderForCustomer(
+    supabase,
+    workspaceId,
+    cliente,
+  );
 
   const { data, error } = await supabase
     .from("cases")
     .insert({
       folder_id: folderId,
       titulo: input.titulo,
-      cliente: trimmedCliente,
+      cliente,
       operacion_tipo: input.operacionTipo ?? null,
       operacion: input.operacion || null,
       material: input.material || null,

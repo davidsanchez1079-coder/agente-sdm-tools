@@ -19,6 +19,7 @@ import {
 import { citiesForState } from "@/lib/locations/mexico-cities";
 import { Combobox } from "@/components/ui/combobox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CaseForm } from "@/components/workspace/case-form";
 import {
   MODULE_BAR,
   MODULE_CHIP,
@@ -71,6 +72,21 @@ const USD_FORMAT = new Intl.NumberFormat("en-US", {
 function formatPotencial(value: number | null): string {
   if (value == null) return "No registrado";
   return `${USD_FORMAT.format(value)} / mes`;
+}
+
+async function reloadCases(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  customerLabel: string,
+): Promise<CaseRow[]> {
+  const { data, error } = await supabase
+    .from("cases")
+    .select(
+      "id, titulo, estado, operacion_tipo, operacion, material, created_at",
+    )
+    .eq("cliente", customerLabel)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as CaseRow[];
 }
 
 type CustomerDetailProps = {
@@ -334,7 +350,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           }
         />
         <InfoTile
-          label="Potencial mensual"
+          label="Potencial total mensual"
           value={formatPotencial(customer.potencial_mensual_usd)}
         />
         <InfoTile
@@ -435,7 +451,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           </label>
           <label className="grid gap-1.5 text-sm">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-              Potencial mensual (USD)
+              Potencial total mensual (USD)
             </span>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -451,6 +467,9 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
                 disabled={saving}
               />
             </div>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              Agregado mensual del cliente, no por oportunidad individual.
+            </span>
           </label>
         </div>
         <label className="grid gap-1.5 text-sm">
@@ -486,10 +505,40 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
         </div>
       </div>
 
+      <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <header>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Crear oportunidad para este cliente
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            El caso queda asociado a {customer.label}. El potencial mensual
+            que captures aquí es por oportunidad, no del cliente.
+          </p>
+        </header>
+        <CaseForm
+          workspaceId={customer.workspace_id}
+          customerLabel={customer.label}
+          onCreated={async () => {
+            try {
+              const supabase = getSupabaseBrowserClient();
+              const refreshed = await reloadCases(supabase, customer.label);
+              setCases(refreshed);
+            } catch (error) {
+              setMessage(
+                error instanceof Error
+                  ? error.message
+                  : "Caso creado, pero no se pudo refrescar la lista.",
+              );
+            }
+          }}
+          onMessage={setMessage}
+        />
+      </section>
+
       <section className="grid gap-3">
         <header className="flex items-baseline justify-between gap-3">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-            Casos asociados
+            Casos / oportunidades
           </h3>
           {casesCount > 0 ? (
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">

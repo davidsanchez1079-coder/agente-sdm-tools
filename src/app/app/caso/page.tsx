@@ -2,8 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useWorkspace } from "@/lib/workspace/context";
-import { FolderPanel } from "@/components/workspace/folder-panel";
-import { CaseForm } from "@/components/workspace/case-form";
+import { CustomerPanel } from "@/components/workspace/customer-panel";
 import { CaseList } from "@/components/workspace/case-list";
 import { CaseFilters } from "@/components/workspace/case-filters";
 import {
@@ -15,9 +14,7 @@ import { ModuleIcon } from "@/components/ui/module-icon";
 
 export default function CasoIndexPage() {
   const { workspaceId } = useWorkspace();
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0);
 
   return (
     <section className="grid min-w-0 gap-6">
@@ -37,42 +34,19 @@ export default function CasoIndexPage() {
           </span>
         </div>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          Carpetas y casos
+          Casos / Oportunidades
         </h2>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-          Selecciona una carpeta para ver sus casos. Usa la barra superior
-          para buscar, filtrar y ordenar; los filtros quedan en la URL y
-          sobreviven el refresh.
+          Vista global de todos los casos del workspace. Para crear un caso
+          nuevo, abre el detalle del cliente correspondiente desde el panel
+          o el catálogo.
         </p>
       </header>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <FolderPanel
-          workspaceId={workspaceId}
-          selectedFolderId={selectedFolderId}
-          onSelectFolder={setSelectedFolderId}
-          onMessage={setMessage}
-        />
+        <CustomerPanel workspaceId={workspaceId} onMessage={setMessage} />
 
         <section className="grid min-w-0 gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Casos
-            </h3>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              {selectedFolderId
-                ? "Casos de la carpeta seleccionada."
-                : "Selecciona una carpeta para ver sus casos."}
-            </p>
-          </div>
-
-          <CaseForm
-            workspaceId={workspaceId}
-            folderId={selectedFolderId}
-            onCreated={() => setRefreshToken((token) => token + 1)}
-            onMessage={setMessage}
-          />
-
           <Suspense
             fallback={
               <div className="h-12 animate-pulse rounded-2xl border border-slate-200 bg-white/50 dark:border-slate-800/80 dark:bg-slate-900/30" />
@@ -88,11 +62,7 @@ export default function CasoIndexPage() {
               </p>
             }
           >
-            <CaseList
-              folderId={selectedFolderId}
-              refreshToken={refreshToken}
-              onMessage={setMessage}
-            />
+            <CaseList onMessage={setMessage} />
           </Suspense>
         </section>
       </div>

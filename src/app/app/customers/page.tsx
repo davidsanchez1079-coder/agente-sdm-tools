@@ -2,13 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace/context";
 import {
+  createCustomer,
   listCustomers,
   type CustomerEstatus,
   type CustomerRow,
 } from "@/lib/customers/customers-db";
+import {
+  MEXICO_STATES,
+  type MexicoState,
+} from "@/lib/locations/mexico-states";
+import { citiesForState } from "@/lib/locations/mexico-cities";
+import { Combobox } from "@/components/ui/combobox";
 import {
   MODULE_BAR,
   MODULE_CHIP,
@@ -35,11 +43,19 @@ const STATUS_BADGE: Record<CustomerEstatus, string> = {
 };
 
 export default function CustomersPage() {
+  const router = useRouter();
   const { workspaceId } = useWorkspace();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+
+  const [showAlta, setShowAlta] = useState(false);
+  const [altaName, setAltaName] = useState("");
+  const [altaState, setAltaState] = useState<MexicoState | "">("");
+  const [altaCity, setAltaCity] = useState("");
+  const [altaPotencial, setAltaPotencial] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,6 +97,51 @@ export default function CustomersPage() {
     };
   }, [workspaceId]);
 
+  const altaPotencialRaw = altaPotencial.trim().replace(/[,\s]/g, "");
+  const altaPotencialNum =
+    altaPotencialRaw === "" ? null : Number(altaPotencialRaw);
+  const altaPotencialInvalid =
+    altaPotencialRaw === "" ||
+    Number.isNaN(altaPotencialNum as number) ||
+    (altaPotencialNum as number) < 0;
+
+  const altaCityOptions = altaState
+    ? citiesForState(altaState).map((c) => c.label)
+    : [];
+
+  const altaReady =
+    altaName.trim() !== "" &&
+    altaState !== "" &&
+    altaCity.trim() !== "" &&
+    !altaPotencialInvalid;
+
+  async function handleAlta() {
+    if (!altaReady) return;
+    setCreating(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const created = await createCustomer(supabase, workspaceId, {
+        label: altaName.trim(),
+        estado: altaState as MexicoState,
+        ciudad: altaCity,
+        potencialMensualUsd:
+          altaPotencialNum === null ? null : Math.trunc(altaPotencialNum),
+      });
+      router.push(`/app/customers/${created.id}`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear el cliente.",
+      );
+      setCreating(false);
+    }
+  }
+
+  const controlClass =
+    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-cyan-400 dark:focus:ring-cyan-400/20";
+
   return (
     <section className="grid gap-6">
       <header
@@ -102,10 +163,124 @@ export default function CustomersPage() {
           Catálogo de clientes
         </h2>
         <p className="max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-          Lista del catálogo de tu workspace. Selecciona un cliente para ver
-          su detalle, editarlo o eliminarlo.
+          Cliente es el objeto principal del workspace. Cada cliente contiene
+          sus oportunidades / casos. Selecciona uno para abrir su detalle, o
+          crea uno nuevo abajo.
         </p>
       </header>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Nuevo cliente
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Nombre, ubicación y potencial total mensual son obligatorios.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAlta((v) => !v)}
+            className="rounded-xl border border-cyan-400 bg-white px-4 py-2 text-sm font-semibold text-cyan-700 shadow-sm transition hover:bg-cyan-50 dark:border-cyan-400/50 dark:bg-slate-900 dark:text-cyan-200 dark:hover:bg-cyan-400/10"
+          >
+            {showAlta ? "Cancelar" : "+ Nuevo cliente"}
+          </button>
+        </div>
+        {showAlta ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm sm:col-span-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Nombre del cliente
+              </span>
+              <input
+                className={controlClass}
+                value={altaName}
+                onChange={(event) => setAltaName(event.target.value)}
+                placeholder="Ej. Industrias del Norte"
+                disabled={creating}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Estado
+              </span>
+              <select
+                className={controlClass}
+                value={altaState}
+                onChange={(event) => {
+                  setAltaState(event.target.value as MexicoState | "");
+                  setAltaCity("");
+                }}
+                disabled={creating}
+              >
+                <option value="">Selecciona estado</option>
+                {MEXICO_STATES.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Ciudad
+              </span>
+              <Combobox
+                value={altaCity}
+                options={altaCityOptions}
+                onChange={setAltaCity}
+                placeholder={
+                  altaState
+                    ? "Busca y selecciona"
+                    : "Selecciona estado primero"
+                }
+                disabled={creating || !altaState}
+                inputClassName={controlClass}
+                emptyMessage="Sin coincidencias en el catálogo"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm sm:col-span-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Potencial total mensual (USD)
+              </span>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 dark:text-slate-400">
+                  $
+                </span>
+                <input
+                  className={`${controlClass} pl-7`}
+                  type="text"
+                  inputMode="numeric"
+                  value={altaPotencial}
+                  onChange={(event) => setAltaPotencial(event.target.value)}
+                  placeholder="0"
+                  disabled={creating}
+                />
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                Agregado mensual del cliente; cada caso tendrá además su
+                propio potencial individual.
+              </span>
+            </label>
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleAlta()}
+                disabled={creating || !altaReady}
+                className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:hover:bg-cyan-300"
+              >
+                {creating ? "Creando…" : "Crear cliente y abrir detalle"}
+              </button>
+              {!altaReady && (altaName || altaState || altaCity || altaPotencial) ? (
+                <span className="text-xs text-amber-600 dark:text-amber-300">
+                  Falta completar nombre, estado, ciudad y potencial.
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {loading ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -113,10 +288,8 @@ export default function CustomersPage() {
         </p>
       ) : customers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
-          Tu catálogo está vacío. Cuando crees casos asignándoles cliente, se
-          incorporan aquí automáticamente. También puedes agregar clientes
-          desde el formulario de creación de caso con la opción
-          &ldquo;+ Nuevo cliente&rdquo;.
+          Tu catálogo está vacío. Usa el botón &ldquo;+ Nuevo cliente&rdquo;
+          arriba para empezar.
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

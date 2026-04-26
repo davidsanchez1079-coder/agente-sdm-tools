@@ -61,7 +61,13 @@ export function buildCaseContext(caseRow: CaseRow): string {
     );
   }
   lines.push(`Requiere RAP: ${caseRow.requiere_rap ? "Sí" : "No"}`);
-  lines.push(`Potencial económico: ${formatPotencialUsd(caseRow.potencial_usd)}`);
+  lines.push(
+    `Potencial mensual de la oportunidad: ${formatPotencialUsd(caseRow.potencial_usd)}${caseRow.potencial_usd != null ? " / mes" : ""}`,
+  );
+  lines.push("");
+  lines.push(
+    "Convención: TODA cifra USD del sistema es mensual salvo que se diga lo contrario. El potencial de un caso es el USD/mes que se espera de esa oportunidad específica; el cliente tiene además su potencial total mensual agregado, separado de los casos individuales.",
+  );
   lines.push("");
   lines.push(
     "Toma este contexto como base. Si detectas inconsistencias o datos faltantes críticos para dar una recomendación sólida, menciónalos como parte de tu respuesta.",

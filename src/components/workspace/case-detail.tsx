@@ -1125,13 +1125,15 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-            Potencial (USD)
+            Potencial mensual de la oportunidad (USD)
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Valor estimado del caso en dólares. Opcional. Ayuda a priorizar.
+            USD/mes que esperas de este caso específico. Distinto del
+            potencial total mensual del cliente, que es el agregado de todas
+            sus oportunidades.
           </p>
           <p className="mt-1 text-xs font-semibold text-slate-900 dark:text-slate-100">
-            Registrado: {formatPotencialUsd(caseItem.potencial_usd)}
+            Registrado: {formatPotencialUsd(caseItem.potencial_usd)}{caseItem.potencial_usd != null ? " / mes" : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
