@@ -10,6 +10,11 @@ import {
   type CaseOperacionTipo,
   type CasePrioridad,
 } from "@/lib/cases/cases";
+import {
+  agenteFullName,
+  listAgentes,
+  type AgenteRow,
+} from "@/lib/agentes/agentes-db";
 
 type CaseFormProps = {
   workspaceId: string;
@@ -39,6 +44,8 @@ export function CaseForm({
   const [maquina, setMaquina] = useState("");
   const [marca, setMarca] = useState<BrandId | "">("");
   const [prioridad, setPrioridad] = useState<CasePrioridad>("media");
+  const [secondaryAgenteId, setSecondaryAgenteId] = useState<string>("");
+  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   const tituloRef = useRef<HTMLInputElement>(null);
@@ -53,6 +60,25 @@ export function CaseForm({
       tituloRef.current?.focus();
     }
   }, [customerLabel]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const list = await listAgentes(supabase, workspaceId, {
+          onlyActive: true,
+        });
+        if (!cancelled) setAgentes(list);
+      } catch {
+        // Silencioso: si falla, el selector queda vacío y se puede crear
+        // caso sin secundario.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
 
   async function handleSubmit() {
     if (!titulo.trim() || !customerLabel) return;
@@ -69,6 +95,7 @@ export function CaseForm({
         maquina: maquina.trim() || undefined,
         marcaPreferida: marca.trim() || undefined,
         prioridad,
+        secondaryAgenteId: secondaryAgenteId || null,
       });
       onCreated(row);
       setTitulo("");
@@ -78,6 +105,7 @@ export function CaseForm({
       setMaquina("");
       setMarca("");
       setPrioridad("media");
+      setSecondaryAgenteId("");
       onMessage?.("Caso creado.");
     } catch (error) {
       onMessage?.(
@@ -157,6 +185,20 @@ export function CaseForm({
         {CASE_PRIORIDADES.map((row) => (
           <option key={row.id} value={row.id}>
             Prioridad: {row.label}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className={controlClass}
+        value={secondaryAgenteId}
+        onChange={(event) => setSecondaryAgenteId(event.target.value)}
+      >
+        <option value="">Sin agente secundario</option>
+        {agentes.map((agente) => (
+          <option key={agente.id} value={agente.id}>
+            Agente: {agenteFullName(agente)}
+            {agente.rol_label ? ` — ${agente.rol_label}` : ""}
           </option>
         ))}
       </select>

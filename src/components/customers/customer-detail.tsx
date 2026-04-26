@@ -21,6 +21,11 @@ import { Combobox } from "@/components/ui/combobox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CaseForm } from "@/components/workspace/case-form";
 import {
+  agenteFullName,
+  listAgentes,
+  type AgenteRow,
+} from "@/lib/agentes/agentes-db";
+import {
   MODULE_BAR,
   MODULE_CHIP,
   MODULE_ICON_BG,
@@ -109,6 +114,9 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
   const [estatusDraft, setEstatusDraft] = useState<CustomerEstatus>("activo");
   const [potencialDraft, setPotencialDraft] = useState("");
   const [notasDraft, setNotasDraft] = useState("");
+  const [secondaryDraft, setSecondaryDraft] = useState<string>("");
+
+  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
 
   const [saving, setSaving] = useState(false);
 
@@ -140,16 +148,23 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
             : "",
         );
         setNotasDraft(row.notas ?? "");
+        setSecondaryDraft(row.secondary_agente_id ?? "");
 
-        const { data, error } = await supabase
-          .from("cases")
-          .select(
-            "id, titulo, estado, operacion_tipo, operacion, material, created_at",
-          )
-          .eq("cliente", row.label)
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        if (!cancelled) setCases((data ?? []) as CaseRow[]);
+        const [casesRes, agentesList] = await Promise.all([
+          supabase
+            .from("cases")
+            .select(
+              "id, titulo, estado, operacion_tipo, operacion, material, created_at",
+            )
+            .eq("cliente", row.label)
+            .order("created_at", { ascending: false }),
+          listAgentes(supabase, row.workspace_id, { onlyActive: true }),
+        ]);
+        if (casesRes.error) throw casesRes.error;
+        if (!cancelled) {
+          setCases((casesRes.data ?? []) as CaseRow[]);
+          setAgentes(agentesList);
+        }
       } catch (error) {
         if (!cancelled) {
           setMessage(
@@ -212,6 +227,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
     labelTrimmed !== customer.label ||
     (estadoDraft || null) !== customer.estado ||
     (ciudadTrimmed || null) !== customer.ciudad ||
+    (secondaryDraft || null) !== customer.secondary_agente_id ||
     (segmentoTrimmed || null) !== customer.segmento ||
     estatusDraft !== customer.estatus ||
     (potencialNum ?? null) !== customer.potencial_mensual_usd ||
@@ -232,6 +248,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
         potencial_mensual_usd:
           potencialNum === null ? null : Math.trunc(potencialNum),
         notas: notasTrimmed || null,
+        secondary_agente_id: secondaryDraft || null,
       });
       setCustomer(updated);
       setLabelDraft(updated.label);
@@ -245,6 +262,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           : "",
       );
       setNotasDraft(updated.notas ?? "");
+      setSecondaryDraft(updated.secondary_agente_id ?? "");
       setMessage("Cliente actualizado.");
     } catch (error) {
       setMessage(
@@ -451,6 +469,29 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           </label>
           <label className="grid gap-1.5 text-sm">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Agente secundario
+            </span>
+            <select
+              className={controlClass}
+              value={secondaryDraft}
+              onChange={(event) => setSecondaryDraft(event.target.value)}
+              disabled={saving}
+            >
+              <option value="">Sin asignar</option>
+              {agentes.map((agente) => (
+                <option key={agente.id} value={agente.id}>
+                  {agenteFullName(agente)}
+                  {agente.rol_label ? ` — ${agente.rol_label}` : ""}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              Persona adicional involucrada con este cliente. Edítalos en
+              el catálogo de agentes.
+            </span>
+          </label>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
               Potencial total mensual (USD)
             </span>
             <div className="relative">
@@ -538,7 +579,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
       <section className="grid gap-3">
         <header className="flex items-baseline justify-between gap-3">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-            Casos / oportunidades
+            Casos/Oportunidades
           </h3>
           {casesCount > 0 ? (
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">

@@ -15,6 +15,7 @@ const NAV_ORDER: ModuleId[] = [
   "usuario",
   "customers",
   "caso",
+  "agentes",
   "brands",
 ];
 

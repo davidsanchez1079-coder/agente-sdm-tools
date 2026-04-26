@@ -28,6 +28,11 @@ import {
   listCustomers,
   type CustomerRow,
 } from "@/lib/customers/customers-db";
+import {
+  agenteFullName,
+  listAgentes,
+  type AgenteRow,
+} from "@/lib/agentes/agentes-db";
 
 const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 
@@ -38,6 +43,7 @@ export function CaseFilters() {
   const { workspaceId } = useWorkspace();
   const [panelOpen, setPanelOpen] = useState(false);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
 
   const filters = useMemo(
     () => parseFiltersFromParams(new URLSearchParams(searchParams.toString())),
@@ -49,11 +55,17 @@ export function CaseFilters() {
     (async () => {
       try {
         const supabase = getSupabaseBrowserClient();
-        const list = await listCustomers(supabase, workspaceId);
-        if (!cancelled) setCustomers(list);
+        const [customersList, agentesList] = await Promise.all([
+          listCustomers(supabase, workspaceId),
+          listAgentes(supabase, workspaceId, { onlyActive: true }),
+        ]);
+        if (!cancelled) {
+          setCustomers(customersList);
+          setAgentes(agentesList);
+        }
       } catch {
-        // Silencioso: si la BD falla, los pills de cliente no aparecen
-        // pero el resto de filtros sigue funcionando.
+        // Silencioso: si la BD falla, los pills de cliente/agente no
+        // aparecen pero el resto de filtros sigue funcionando.
       }
     })();
     return () => {
@@ -107,6 +119,12 @@ export function CaseFilters() {
 
   const handleToggleCliente = (label: string) =>
     pushFilters({ ...filters, clientes: toggleClienteByLabel(label) });
+
+  const handleToggleAgente = (id: string) =>
+    pushFilters({
+      ...filters,
+      agentes: toggleFromArray(filters.agentes, id),
+    });
 
   const handleToggleFabricante = (value: BrandId) =>
     pushFilters({
@@ -217,6 +235,17 @@ export function CaseFilters() {
               onRemove={() => handleToggleCliente(label)}
             />
           ))}
+          {filters.agentes.map((id) => {
+            const agente = agentes.find((a) => a.id === id);
+            const label = agente ? agenteFullName(agente) : id;
+            return (
+              <Chip
+                key={`agente-${id}`}
+                label={`Agente: ${label}`}
+                onRemove={() => handleToggleAgente(id)}
+              />
+            );
+          })}
           {filters.fabricantes.map((id) => {
             const label = BRANDS.find((b) => b.id === id)?.label ?? id;
             return (
@@ -288,6 +317,29 @@ export function CaseFilters() {
                     className={`${pillBase} ${active ? pillActive : pillInactive}`}
                   >
                     {customer.label}
+                  </button>
+                );
+              })
+            )}
+          </FilterGroup>
+
+          <FilterGroup label="Agente involucrado">
+            {agentes.length === 0 ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Aún no hay agentes activos en el catálogo.
+              </p>
+            ) : (
+              agentes.map((agente) => {
+                const active = filters.agentes.includes(agente.id);
+                return (
+                  <button
+                    key={agente.id}
+                    type="button"
+                    onClick={() => handleToggleAgente(agente.id)}
+                    className={`${pillBase} ${active ? pillActive : pillInactive}`}
+                  >
+                    {agenteFullName(agente)}
+                    {agente.rol_label ? ` · ${agente.rol_label}` : ""}
                   </button>
                 );
               })
