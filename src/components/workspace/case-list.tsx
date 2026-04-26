@@ -6,9 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   deleteCase,
-  listCases,
+  listCasesByCustomer,
   type CaseRow,
 } from "@/lib/workspace/folders";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   estadoBadge,
   estadoLabel,
@@ -26,17 +27,23 @@ import {
 import { formatPotencialUsd } from "@/lib/cases/cases";
 
 type CaseListProps = {
-  folderId: string | null;
+  // null = todos los casos del workspace (RLS scopea).
+  // string = filtra por cliente label exacto (case-insensitive).
+  // "" = legacy "Sin cliente" (cases.cliente IS NULL).
+  customerFilter?: string | null;
   onMessage?: (message: string | null) => void;
   refreshToken?: number;
 };
 
 export function CaseList({
-  folderId,
+  customerFilter = null,
   onMessage,
   refreshToken = 0,
 }: CaseListProps) {
   const [rows, setRows] = useState<CaseRow[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<CaseRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
 
   const filters = useMemo(
@@ -54,13 +61,10 @@ export function CaseList({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!folderId) {
-        if (!cancelled) setRows([]);
-        return;
-      }
+      setLoading(true);
       try {
         const supabase = getSupabaseBrowserClient();
-        const data = await listCases(supabase, folderId);
+        const data = await listCasesByCustomer(supabase, customerFilter);
         if (!cancelled) setRows(data);
       } catch (error) {
         if (!cancelled) {
@@ -70,18 +74,24 @@ export function CaseList({
               : "No se pudieron cargar los casos.",
           );
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [folderId, refreshToken, notify]);
+  }, [customerFilter, refreshToken, notify]);
 
-  async function handleDelete(id: string) {
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setDeleting(true);
     try {
       const supabase = getSupabaseBrowserClient();
       await deleteCase(supabase, id);
       setRows((prev) => prev.filter((row) => row.id !== id));
+      setPendingDelete(null);
       notify("Caso eliminado.");
     } catch (error) {
       notify(
@@ -89,15 +99,9 @@ export function CaseList({
           ? error.message
           : "No se pudo eliminar el caso.",
       );
+    } finally {
+      setDeleting(false);
     }
-  }
-
-  if (!folderId) {
-    return (
-      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-        Selecciona una carpeta para ver sus casos.
-      </p>
-    );
   }
 
   const filtered = sortCases(applyFilters(rows, filters), filters.sort);
@@ -105,10 +109,18 @@ export function CaseList({
   const totalAfter = filtered.length;
   const anyFilter = hasAnyFilterOrQuery(filters);
 
+  if (loading) {
+    return (
+      <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+        Cargando casos…
+      </p>
+    );
+  }
+
   if (!totalBefore) {
     return (
       <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">
-        Esta carpeta todavía no tiene casos.
+        Aún no hay casos en este workspace.
       </p>
     );
   }
@@ -118,7 +130,7 @@ export function CaseList({
       <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
         Ningún caso coincide con los filtros actuales. Ajusta o limpia
         filtros para ver los {totalBefore}{" "}
-        {totalBefore === 1 ? "caso" : "casos"} de esta carpeta.
+        {totalBefore === 1 ? "caso" : "casos"} disponibles.
       </div>
     );
   }
@@ -171,7 +183,7 @@ export function CaseList({
                 ) : null}
                 {row.potencial_usd != null ? (
                   <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                    {formatPotencialUsd(row.potencial_usd)}
+                    {formatPotencialUsd(row.potencial_usd)} / mes
                   </span>
                 ) : null}
               </div>
@@ -195,7 +207,7 @@ export function CaseList({
             </Link>
             <button
               type="button"
-              onClick={() => void handleDelete(row.id)}
+              onClick={() => setPendingDelete(row)}
               className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
             >
               Borrar
@@ -203,6 +215,23 @@ export function CaseList({
           </div>
         </div>
       ))}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete
+            ? `¿Borrar el caso «${pendingDelete.titulo}»?`
+            : ""
+        }
+        description="Se eliminan también los mensajes y los adjuntos. No se puede deshacer."
+        confirmLabel="Borrar caso"
+        tone="destructive"
+        busy={deleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

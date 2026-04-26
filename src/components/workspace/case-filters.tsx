@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/lib/workspace/context";
 import {
   CASE_ESTADOS,
   CASE_PRIORIDADES,
@@ -22,7 +24,10 @@ import {
   type SortKey,
 } from "@/lib/cases/filters";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
-import { CUSTOMERS, type CustomerId } from "@/lib/customers/customers";
+import {
+  listCustomers,
+  type CustomerRow,
+} from "@/lib/customers/customers-db";
 
 const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 
@@ -30,12 +35,31 @@ export function CaseFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { workspaceId } = useWorkspace();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
 
   const filters = useMemo(
     () => parseFiltersFromParams(new URLSearchParams(searchParams.toString())),
     [searchParams],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const list = await listCustomers(supabase, workspaceId);
+        if (!cancelled) setCustomers(list);
+      } catch {
+        // Silencioso: si la BD falla, los pills de cliente no aparecen
+        // pero el resto de filtros sigue funcionando.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
 
   const activePanelCount = countActivePanelFilters(filters);
   const hasAnything = hasAnyFilterOrQuery(filters);
@@ -58,6 +82,14 @@ export function CaseFilters() {
       : [...list, value];
   }
 
+  function toggleClienteByLabel(label: string): string[] {
+    const lc = label.toLowerCase();
+    const exists = filters.clientes.some((c) => c.toLowerCase() === lc);
+    return exists
+      ? filters.clientes.filter((c) => c.toLowerCase() !== lc)
+      : [...filters.clientes, label];
+  }
+
   const handleSearchChange = (value: string) =>
     pushFilters({ ...filters, q: value });
 
@@ -73,11 +105,8 @@ export function CaseFilters() {
       prioridades: toggleFromArray(filters.prioridades, value),
     });
 
-  const handleToggleCliente = (value: CustomerId) =>
-    pushFilters({
-      ...filters,
-      clientes: toggleFromArray(filters.clientes, value),
-    });
+  const handleToggleCliente = (label: string) =>
+    pushFilters({ ...filters, clientes: toggleClienteByLabel(label) });
 
   const handleToggleFabricante = (value: BrandId) =>
     pushFilters({
@@ -181,16 +210,13 @@ export function CaseFilters() {
               onRemove={() => handleTogglePrioridad(id)}
             />
           ))}
-          {filters.clientes.map((id) => {
-            const label = CUSTOMERS.find((c) => c.id === id)?.label ?? id;
-            return (
-              <Chip
-                key={`cliente-${id}`}
-                label={`Cliente: ${label}`}
-                onRemove={() => handleToggleCliente(id)}
-              />
-            );
-          })}
+          {filters.clientes.map((label) => (
+            <Chip
+              key={`cliente-${label}`}
+              label={`Cliente: ${label}`}
+              onRemove={() => handleToggleCliente(label)}
+            />
+          ))}
           {filters.fabricantes.map((id) => {
             const label = BRANDS.find((b) => b.id === id)?.label ?? id;
             return (
@@ -245,19 +271,27 @@ export function CaseFilters() {
           </FilterGroup>
 
           <FilterGroup label="Cliente">
-            {CUSTOMERS.map((customer) => {
-              const active = filters.clientes.includes(customer.id);
-              return (
-                <button
-                  key={customer.id}
-                  type="button"
-                  onClick={() => handleToggleCliente(customer.id)}
-                  className={`${pillBase} ${active ? pillActive : pillInactive}`}
-                >
-                  {customer.label}
-                </button>
-              );
-            })}
+            {customers.length === 0 ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Aún no hay clientes en el catálogo.
+              </p>
+            ) : (
+              customers.map((customer) => {
+                const active = filters.clientes.some(
+                  (c) => c.toLowerCase() === customer.label.toLowerCase(),
+                );
+                return (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => handleToggleCliente(customer.label)}
+                    className={`${pillBase} ${active ? pillActive : pillInactive}`}
+                  >
+                    {customer.label}
+                  </button>
+                );
+              })
+            )}
           </FilterGroup>
 
           <FilterGroup label="Fabricante">

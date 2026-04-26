@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
-import { CUSTOMERS } from "@/lib/customers/customers";
 import {
   CASE_OPERACION_TIPOS,
   CASE_PRIORIDADES,
@@ -13,16 +12,25 @@ import {
 } from "@/lib/cases/cases";
 
 type CaseFormProps = {
-  folderId: string | null;
+  workspaceId: string;
+  customerLabel: string;
   onCreated: (row: CaseRow) => void;
   onMessage?: (message: string | null) => void;
 };
 
 const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 
-export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
+// Form de creación de caso para un cliente específico. Diseñado para
+// vivir dentro de customer-detail — el cliente queda fijo (no editable
+// desde aquí) y todos los demás campos son inputs estándar. Sigue la
+// regla "cada caso vive dentro de un cliente".
+export function CaseForm({
+  workspaceId,
+  customerLabel,
+  onCreated,
+  onMessage,
+}: CaseFormProps) {
   const [titulo, setTitulo] = useState("");
-  const [cliente, setCliente] = useState("");
   const [operacionTipo, setOperacionTipo] = useState<CaseOperacionTipo | "">(
     "",
   );
@@ -34,25 +42,27 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   const [saving, setSaving] = useState(false);
 
   const tituloRef = useRef<HTMLInputElement>(null);
-  const prevFolderIdRef = useRef<string | null>(folderId);
+  const prevCustomerRef = useRef<string>(customerLabel);
 
-  // Auto-focus al título cuando una carpeta recién se selecciona (null → set).
-  // No roba foco al cambiar entre carpetas ya seleccionadas.
+  // Auto-focus al título cuando el form se monta o cuando cambia el
+  // cliente de contexto. Evita robo de foco al re-renderizar sin razón.
   useEffect(() => {
-    const prev = prevFolderIdRef.current;
-    prevFolderIdRef.current = folderId;
-    if (folderId && !prev) tituloRef.current?.focus();
-  }, [folderId]);
+    const prev = prevCustomerRef.current;
+    prevCustomerRef.current = customerLabel;
+    if (customerLabel && customerLabel !== prev) {
+      tituloRef.current?.focus();
+    }
+  }, [customerLabel]);
 
   async function handleSubmit() {
-    if (!folderId || !titulo.trim()) return;
+    if (!titulo.trim() || !customerLabel) return;
     setSaving(true);
     onMessage?.(null);
     try {
       const supabase = getSupabaseBrowserClient();
-      const row = await createCase(supabase, folderId, {
+      const row = await createCase(supabase, workspaceId, {
         titulo: titulo.trim(),
-        cliente: cliente.trim() || undefined,
+        cliente: customerLabel,
         operacionTipo: operacionTipo || undefined,
         operacion: operacion.trim() || undefined,
         material: material.trim() || undefined,
@@ -62,7 +72,6 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
       });
       onCreated(row);
       setTitulo("");
-      setCliente("");
       setOperacionTipo("");
       setOperacion("");
       setMaterial("");
@@ -91,23 +100,8 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
         className={controlClass}
         value={titulo}
         onChange={(event) => setTitulo(event.target.value)}
-        placeholder="Título del caso"
-        disabled={!folderId}
+        placeholder="Título del caso / oportunidad"
       />
-
-      <select
-        className={controlClass}
-        value={cliente}
-        onChange={(event) => setCliente(event.target.value)}
-        disabled={!folderId}
-      >
-        <option value="">Sin cliente</option>
-        {CUSTOMERS.map((customer) => (
-          <option key={customer.id} value={customer.label}>
-            {customer.label}
-          </option>
-        ))}
-      </select>
 
       <select
         className={controlClass}
@@ -115,7 +109,6 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
         onChange={(event) =>
           setOperacionTipo(event.target.value as CaseOperacionTipo | "")
         }
-        disabled={!folderId}
       >
         <option value="">Tipo de operación</option>
         {CASE_OPERACION_TIPOS.map((row) => (
@@ -129,30 +122,24 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
         value={operacion}
         onChange={(event) => setOperacion(event.target.value)}
         placeholder="Detalle de operación (opcional)"
-        disabled={!folderId}
       />
       <input
         className={controlClass}
         value={material}
         onChange={(event) => setMaterial(event.target.value)}
         placeholder="Material"
-        disabled={!folderId}
       />
       <input
         className={controlClass}
         value={maquina}
         onChange={(event) => setMaquina(event.target.value)}
         placeholder="Máquina"
-        disabled={!folderId}
       />
 
       <select
         className={controlClass}
         value={marca}
-        onChange={(event) =>
-          setMarca(event.target.value as BrandId | "")
-        }
-        disabled={!folderId}
+        onChange={(event) => setMarca(event.target.value as BrandId | "")}
       >
         <option value="">Sin fabricante</option>
         {FABRICANTES.map((brand) => (
@@ -166,7 +153,6 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
         className={controlClass}
         value={prioridad}
         onChange={(event) => setPrioridad(event.target.value as CasePrioridad)}
-        disabled={!folderId}
       >
         {CASE_PRIORIDADES.map((row) => (
           <option key={row.id} value={row.id}>
@@ -178,10 +164,10 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
       <button
         type="button"
         onClick={() => void handleSubmit()}
-        disabled={!folderId || saving || !titulo.trim()}
+        disabled={saving || !titulo.trim()}
         className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-cyan-300"
       >
-        {saving ? "Creando…" : "Crear caso"}
+        {saving ? "Creando…" : `Crear caso para ${customerLabel}`}
       </button>
     </div>
   );
