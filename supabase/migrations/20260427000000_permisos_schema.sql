@@ -1,20 +1,3 @@
--- GOTIA — PR-A: schema de permisos
--- Roles, invitaciones, marcas asignadas, compartición puntual de cases.
---
--- IMPORTANTE: este migration NO toca RLS de tablas existentes (cases,
--- customers, agentes, folders, messages, attachments). Esas se
--- reescriben en PR-D, que es el corte crítico documentado.
---
--- Backfill al final: cada workspace owner actual queda como gerente
--- activo en su propio workspace.
---
--- Idempotente. Sin begin/commit explícito (cada statement en su propia
--- transacción para que cualquier error se vea aislado en SQL Editor).
-
--- ============================================================
--- workspace_members: membresía de cada persona en cada workspace
--- ============================================================
-
 create table if not exists public.workspace_members (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
@@ -32,6 +15,7 @@ create table if not exists public.workspace_members (
 
 alter table public.workspace_members
   drop constraint if exists workspace_members_rol_check;
+
 alter table public.workspace_members
   add constraint workspace_members_rol_check
   check (rol in ('gerente','interno','externo'));
@@ -49,10 +33,6 @@ create index if not exists workspace_members_token_idx
   on public.workspace_members (invitation_token)
   where invitation_token is not null;
 
--- ============================================================
--- workspace_member_brands: marcas asignadas a cada externo
--- ============================================================
-
 create table if not exists public.workspace_member_brands (
   member_id uuid not null references public.workspace_members(id) on delete cascade,
   brand_id text not null,
@@ -65,10 +45,6 @@ create index if not exists workspace_member_brands_member_idx
 
 create index if not exists workspace_member_brands_brand_idx
   on public.workspace_member_brands (brand_id);
-
--- ============================================================
--- case_shares: compartición puntual de un caso a un correo
--- ============================================================
 
 create table if not exists public.case_shares (
   id uuid primary key default gen_random_uuid(),
@@ -93,13 +69,6 @@ create index if not exists case_shares_active_idx
   on public.case_shares (case_id)
   where revoked_at is null;
 
--- ============================================================
--- Helpers SQL — usadas por RLS de PR-D y por la app
--- ============================================================
-
--- True si el auth user actual es member activo del workspace con
--- alguno de los roles dados. Stable + security invoker para respetar
--- el contexto del caller.
 create or replace function public.user_has_workspace_role(
   ws_id uuid,
   roles text[]
@@ -120,8 +89,6 @@ as $$
   );
 $$;
 
--- Set de brand_ids asignados al auth user actual como externo en el
--- workspace. Vacío si no es externo.
 create or replace function public.user_brand_ids_for_workspace(
   ws_id uuid
 ) returns setof text
@@ -138,12 +105,6 @@ as $$
     and m.rol = 'externo'
     and u.auth_user_id = auth.uid();
 $$;
-
--- ============================================================
--- Función de aceptación de invitación (SECURITY DEFINER)
--- Bypassa RLS porque el invitee aún no es member visible para sí
--- mismo. Valida token y bind contra el users.id del auth.uid() actual.
--- ============================================================
 
 create or replace function public.accept_workspace_invitation(token text)
 returns uuid
@@ -171,7 +132,7 @@ begin
   limit 1;
 
   if member_row.id is null then
-    raise exception 'Token de invitación inválido o expirado';
+    raise exception 'Token de invitacion invalido o expirado';
   end if;
 
   update public.workspace_members
@@ -182,7 +143,6 @@ begin
       activo = true
   where id = member_row.id;
 
-  -- Liga case_shares pendientes que apuntaban al email del invitee.
   update public.case_shares
   set shared_with_member_id = member_row.id
   where lower(shared_with_email) = lower(member_row.email)
@@ -192,12 +152,6 @@ begin
   return member_row.id;
 end;
 $$;
-
--- ============================================================
--- Función para preview de una invitación por token (read-only).
--- Devuelve los datos básicos de la invitación pendiente para que la
--- página /invitacion/{token} muestre contexto antes del accept.
--- ============================================================
 
 create or replace function public.preview_workspace_invitation(token text)
 returns table (
@@ -225,15 +179,10 @@ as $$
   limit 1;
 $$;
 
--- ============================================================
--- RLS — sobre las tres tablas nuevas
--- ============================================================
-
 alter table public.workspace_members enable row level security;
 alter table public.workspace_member_brands enable row level security;
 alter table public.case_shares enable row level security;
 
--- workspace_members
 drop policy if exists workspace_members_select on public.workspace_members;
 drop policy if exists workspace_members_insert on public.workspace_members;
 drop policy if exists workspace_members_update on public.workspace_members;
@@ -279,7 +228,6 @@ create policy workspace_members_delete on public.workspace_members
     or public.user_has_workspace_role(workspace_members.workspace_id, array['gerente'])
   );
 
--- workspace_member_brands
 drop policy if exists workspace_member_brands_select on public.workspace_member_brands;
 drop policy if exists workspace_member_brands_insert on public.workspace_member_brands;
 drop policy if exists workspace_member_brands_update on public.workspace_member_brands;
@@ -351,13 +299,11 @@ create policy workspace_member_brands_delete on public.workspace_member_brands
     )
   );
 
--- case_shares
 drop policy if exists case_shares_select on public.case_shares;
 drop policy if exists case_shares_insert on public.case_shares;
 drop policy if exists case_shares_update on public.case_shares;
 drop policy if exists case_shares_delete on public.case_shares;
 
--- SELECT: gerente del workspace del case; quien creó el share; quien recibió el share
 create policy case_shares_select on public.case_shares
   for select
   using (
@@ -373,7 +319,8 @@ create policy case_shares_select on public.case_shares
       case_shares.shared_by is not null
       and exists (
         select 1 from public.users u
-        where u.id = case_shares.shared_by and u.auth_user_id = auth.uid()
+        where u.id = case_shares.shared_by
+          and u.auth_user_id = auth.uid()
       )
     )
     or (
@@ -388,8 +335,6 @@ create policy case_shares_select on public.case_shares
     )
   );
 
--- INSERT: gerente del workspace del case; o cualquier member activo
--- (interno/gerente) del workspace que creó el case
 create policy case_shares_insert on public.case_shares
   for insert
   with check (
@@ -403,7 +348,6 @@ create policy case_shares_insert on public.case_shares
     )
   );
 
--- UPDATE / DELETE: gerente del workspace; o el creador del share
 create policy case_shares_update on public.case_shares
   for update
   using (
@@ -419,7 +363,8 @@ create policy case_shares_update on public.case_shares
       case_shares.shared_by is not null
       and exists (
         select 1 from public.users u
-        where u.id = case_shares.shared_by and u.auth_user_id = auth.uid()
+        where u.id = case_shares.shared_by
+          and u.auth_user_id = auth.uid()
       )
     )
   )
@@ -436,7 +381,8 @@ create policy case_shares_update on public.case_shares
       shared_by is not null
       and exists (
         select 1 from public.users u
-        where u.id = shared_by and u.auth_user_id = auth.uid()
+        where u.id = shared_by
+          and u.auth_user_id = auth.uid()
       )
     )
   );
@@ -456,14 +402,11 @@ create policy case_shares_delete on public.case_shares
       case_shares.shared_by is not null
       and exists (
         select 1 from public.users u
-        where u.id = case_shares.shared_by and u.auth_user_id = auth.uid()
+        where u.id = case_shares.shared_by
+          and u.auth_user_id = auth.uid()
       )
     )
   );
-
--- ============================================================
--- Backfill: cada workspace owner queda como gerente activo
--- ============================================================
 
 insert into public.workspace_members
   (workspace_id, user_id, email, rol, activo, joined_at)
