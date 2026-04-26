@@ -32,6 +32,11 @@ const TILES: {
       "Personas asignables a clientes y casos como agente involucrado (técnico, apoyo comercial, otro responsable).",
   },
   {
+    id: "accesos",
+    description:
+      "Quién está autorizado en el workspace, con qué rol, qué marcas tiene asignadas y qué se le compartió.",
+  },
+  {
     id: "brands",
     description:
       "Catálogo de fabricantes. El fabricante del caso activa el modo Especialista del agente.",

@@ -58,6 +58,13 @@ export function ModuleIcon({ id, className = "h-5 w-5" }: ModuleIconProps) {
           <path d="M11 16.5c0-2 1.5-3 3-3s3 1 3 3" />
         </svg>
       );
+    case "accesos":
+      return (
+        <svg {...base}>
+          <path d="M10 2.5L4 5v5c0 4 2.6 6.6 6 7.5 3.4-0.9 6-3.5 6-7.5V5l-6-2.5z" />
+          <path d="M7.5 10l1.8 1.8L13 7.7" />
+        </svg>
+      );
     case "brands":
       return (
         <svg {...base}>
