@@ -74,26 +74,77 @@ create index if not exists customers_workspace_idx
 
 alter table public.customers enable row level security;
 
+-- Cuatro policies explícitas en lugar de FOR ALL. La policy original
+-- con FOR ALL + WITH CHECK referenciando `customers.workspace_id`
+-- rechazaba INSERT con 42501, posiblemente por cómo PG resuelve la
+-- referencia a la fila nueva en ese caso. Con policies separadas y
+-- columna pelada `workspace_id` (sin prefijo) en WITH CHECK la
+-- evaluación es inequívoca contra la fila propuesta.
 drop policy if exists customers_owner_or_admin on public.customers;
-create policy customers_owner_or_admin
-  on public.customers
-  for all
+drop policy if exists customers_owner_select on public.customers;
+drop policy if exists customers_owner_insert on public.customers;
+drop policy if exists customers_owner_update on public.customers;
+drop policy if exists customers_owner_delete on public.customers;
+
+create policy customers_owner_select on public.customers
+  for select
   using (
-    exists (
+    public.is_admin()
+    or exists (
       select 1
       from public.workspaces w
       join public.users u on u.id = w.user_id
       where w.id = customers.workspace_id
-        and (u.auth_user_id = auth.uid() or public.is_admin())
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy customers_owner_insert on public.customers
+  for insert
+  with check (
+    public.is_admin()
+    or exists (
+      select 1
+      from public.workspaces w
+      join public.users u on u.id = w.user_id
+      where w.id = workspace_id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy customers_owner_update on public.customers
+  for update
+  using (
+    public.is_admin()
+    or exists (
+      select 1
+      from public.workspaces w
+      join public.users u on u.id = w.user_id
+      where w.id = customers.workspace_id
+        and u.auth_user_id = auth.uid()
     )
   )
   with check (
-    exists (
+    public.is_admin()
+    or exists (
+      select 1
+      from public.workspaces w
+      join public.users u on u.id = w.user_id
+      where w.id = workspace_id
+        and u.auth_user_id = auth.uid()
+    )
+  );
+
+create policy customers_owner_delete on public.customers
+  for delete
+  using (
+    public.is_admin()
+    or exists (
       select 1
       from public.workspaces w
       join public.users u on u.id = w.user_id
       where w.id = customers.workspace_id
-        and (u.auth_user_id = auth.uid() or public.is_admin())
+        and u.auth_user_id = auth.uid()
     )
   );
 
