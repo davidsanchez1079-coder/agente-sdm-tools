@@ -67,6 +67,7 @@ export default function CasoIndexPage() {
           </div>
 
           <CaseForm
+            workspaceId={workspaceId}
             folderId={selectedFolderId}
             onCreated={() => setRefreshToken((token) => token + 1)}
             onMessage={setMessage}

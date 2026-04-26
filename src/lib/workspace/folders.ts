@@ -5,6 +5,7 @@ import type {
   CasePrioridad,
   CaseResultadoCierre,
 } from "@/lib/cases/cases";
+import { ensureCustomer } from "@/lib/customers/customers-db";
 
 type FolderRow = {
   id: string;
@@ -100,14 +101,25 @@ export type CreateCaseInput = {
 export async function createCase(
   supabase: SupabaseClient,
   folderId: string,
+  workspaceId: string,
   input: CreateCaseInput,
 ) {
+  const trimmedCliente = input.cliente?.trim() || null;
+
+  // Auto-add: si el caso menciona un cliente, garantizamos que exista
+  // en el catálogo del workspace antes de crear el caso. Idempotente
+  // vía unique index (workspace_id, lower(label)). Esto cubre cualquier
+  // flujo válido — form, importación, agente IA en el futuro.
+  if (trimmedCliente) {
+    await ensureCustomer(supabase, workspaceId, trimmedCliente);
+  }
+
   const { data, error } = await supabase
     .from("cases")
     .insert({
       folder_id: folderId,
       titulo: input.titulo,
-      cliente: input.cliente || null,
+      cliente: trimmedCliente,
       operacion_tipo: input.operacionTipo ?? null,
       operacion: input.operacion || null,
       material: input.material || null,
