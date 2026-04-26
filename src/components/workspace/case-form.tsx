@@ -5,7 +5,12 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import { CUSTOMERS } from "@/lib/customers/customers";
-import { CASE_PRIORIDADES, type CasePrioridad } from "@/lib/cases/cases";
+import {
+  CASE_OPERACION_TIPOS,
+  CASE_PRIORIDADES,
+  type CaseOperacionTipo,
+  type CasePrioridad,
+} from "@/lib/cases/cases";
 
 type CaseFormProps = {
   folderId: string | null;
@@ -18,6 +23,9 @@ const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   const [titulo, setTitulo] = useState("");
   const [cliente, setCliente] = useState("");
+  const [operacionTipo, setOperacionTipo] = useState<CaseOperacionTipo | "">(
+    "",
+  );
   const [operacion, setOperacion] = useState("");
   const [material, setMaterial] = useState("");
   const [maquina, setMaquina] = useState("");
@@ -34,6 +42,7 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
       const row = await createCase(supabase, folderId, {
         titulo: titulo.trim(),
         cliente: cliente.trim() || undefined,
+        operacionTipo: operacionTipo || undefined,
         operacion: operacion.trim() || undefined,
         material: material.trim() || undefined,
         maquina: maquina.trim() || undefined,
@@ -43,6 +52,7 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
       onCreated(row);
       setTitulo("");
       setCliente("");
+      setOperacionTipo("");
       setOperacion("");
       setMaterial("");
       setMaquina("");
@@ -87,11 +97,26 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
         ))}
       </select>
 
+      <select
+        className={controlClass}
+        value={operacionTipo}
+        onChange={(event) =>
+          setOperacionTipo(event.target.value as CaseOperacionTipo | "")
+        }
+        disabled={!folderId}
+      >
+        <option value="">Tipo de operación</option>
+        {CASE_OPERACION_TIPOS.map((row) => (
+          <option key={row.id} value={row.id}>
+            {row.label}
+          </option>
+        ))}
+      </select>
       <input
         className={controlClass}
         value={operacion}
         onChange={(event) => setOperacion(event.target.value)}
-        placeholder="Operación"
+        placeholder="Detalle de operación (opcional)"
         disabled={!folderId}
       />
       <input

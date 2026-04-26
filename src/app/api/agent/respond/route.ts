@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import { respondToCase } from "@/lib/agent/orchestrator";
 import { fetchAttachmentsAsContentBlocks } from "@/lib/agent/attachments";
-import type { CaseRow } from "@/lib/workspace/folders";
+import { CASE_COLUMNS, type CaseRow } from "@/lib/workspace/folders";
 
 type Body = {
   caseId?: unknown;
@@ -11,9 +11,6 @@ type Body = {
   mode?: unknown;
   attachmentIds?: unknown;
 };
-
-const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_at";
 
 const ALL_BRAND_IDS: BrandId[] = BRANDS.map((b) => b.id);
 
