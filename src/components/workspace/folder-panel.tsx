@@ -87,6 +87,7 @@ export function FolderPanel({
       const row = await createFolder(supabase, workspaceId, folderName.trim());
       setFolders((prev) => [...prev, row]);
       setFolderName("");
+      onSelectFolder(row.id);
       notify("Carpeta creada.");
     } catch (error) {
       notify(
