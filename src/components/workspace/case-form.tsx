@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
@@ -32,6 +32,17 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   const [marca, setMarca] = useState<BrandId | "">("");
   const [prioridad, setPrioridad] = useState<CasePrioridad>("media");
   const [saving, setSaving] = useState(false);
+
+  const tituloRef = useRef<HTMLInputElement>(null);
+  const prevFolderIdRef = useRef<string | null>(folderId);
+
+  // Auto-focus al título cuando una carpeta recién se selecciona (null → set).
+  // No roba foco al cambiar entre carpetas ya seleccionadas.
+  useEffect(() => {
+    const prev = prevFolderIdRef.current;
+    prevFolderIdRef.current = folderId;
+    if (folderId && !prev) tituloRef.current?.focus();
+  }, [folderId]);
 
   async function handleSubmit() {
     if (!folderId || !titulo.trim()) return;
@@ -76,6 +87,7 @@ export function CaseForm({ folderId, onCreated, onMessage }: CaseFormProps) {
   return (
     <div className="grid gap-3">
       <input
+        ref={tituloRef}
         className={controlClass}
         value={titulo}
         onChange={(event) => setTitulo(event.target.value)}
