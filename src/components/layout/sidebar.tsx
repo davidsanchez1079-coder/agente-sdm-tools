@@ -64,11 +64,14 @@ export function Sidebar({
           {!collapsed ? (
             <div className="min-w-0">
               <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-200">
-                Agente SDM
+                Plataforma
               </span>
-              <h1 className="mt-1.5 text-base font-semibold tracking-tight text-slate-900 dark:text-white">
-                Tools
+              <h1 className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+                GOTIA
               </h1>
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                Gestión de Oportunidades y Soporte Técnico con IA
+              </p>
             </div>
           ) : null}
           <button
@@ -158,7 +161,7 @@ export function Sidebar({
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:hidden dark:border-slate-800/80 dark:bg-slate-900/70">
         <div className="min-w-0 flex-1">
           <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.25em] text-cyan-700 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-200">
-            Agente SDM
+            GOTIA
           </span>
           <p className="mt-0.5 truncate text-sm font-medium text-slate-900 dark:text-white">
             {userName}
