@@ -34,9 +34,9 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
   },
   caso: {
     id: "caso",
-    label: "Caso",
+    label: "Caso/Oportunidad",
     href: "/app/caso",
-    kicker: "Caso",
+    kicker: "Caso/Oportunidad",
   },
   agentes: {
     id: "agentes",

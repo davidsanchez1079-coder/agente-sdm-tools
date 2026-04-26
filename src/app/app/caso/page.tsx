@@ -30,11 +30,11 @@ export default function CasoIndexPage() {
           <span
             className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${MODULE_CHIP.caso}`}
           >
-            Caso
+            Caso/Oportunidad
           </span>
         </div>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          Casos / Oportunidades
+          Casos/Oportunidades
         </h2>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400">
           Vista global de todos los casos del workspace. Para crear un caso

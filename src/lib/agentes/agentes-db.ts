@@ -6,12 +6,13 @@ export type AgenteRow = {
   nombre: string;
   apellido: string | null;
   rol_label: string | null;
+  email: string | null;
   activo: boolean;
   created_at: string;
 };
 
 const AGENTE_COLUMNS =
-  "id, workspace_id, nombre, apellido, rol_label, activo, created_at";
+  "id, workspace_id, nombre, apellido, rol_label, email, activo, created_at";
 
 export function agenteFullName(
   agente: Pick<AgenteRow, "nombre" | "apellido">,
@@ -55,6 +56,7 @@ export type CreateAgenteInput = {
   nombre: string;
   apellido?: string | null;
   rolLabel?: string | null;
+  email?: string | null;
   activo?: boolean;
 };
 
@@ -70,6 +72,7 @@ export async function createAgente(
       nombre: input.nombre.trim(),
       apellido: input.apellido?.trim() || null,
       rol_label: input.rolLabel?.trim() || null,
+      email: input.email?.trim() || null,
       activo: input.activo ?? true,
     })
     .select(AGENTE_COLUMNS)
@@ -82,6 +85,7 @@ export type UpdateAgentePatch = Partial<{
   nombre: string;
   apellido: string | null;
   rol_label: string | null;
+  email: string | null;
   activo: boolean;
 }>;
 

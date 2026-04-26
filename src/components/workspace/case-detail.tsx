@@ -707,7 +707,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${MODULE_CHIP.caso}`}
           >
-            Caso
+            Caso/Oportunidad
           </span>
           <span
             className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${estadoBadge(caseItem.estado)}`}

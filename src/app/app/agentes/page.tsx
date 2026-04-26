@@ -30,12 +30,14 @@ export default function AgentesPage() {
   const [altaNombre, setAltaNombre] = useState("");
   const [altaApellido, setAltaApellido] = useState("");
   const [altaRol, setAltaRol] = useState("");
+  const [altaEmail, setAltaEmail] = useState("");
   const [creating, setCreating] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editApellido, setEditApellido] = useState("");
   const [editRol, setEditRol] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editActivo, setEditActivo] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -82,6 +84,7 @@ export default function AgentesPage() {
         nombre: altaNombre.trim(),
         apellido: altaApellido.trim() || null,
         rolLabel: altaRol.trim() || null,
+        email: altaEmail.trim() || null,
       });
       setAgentes((prev) =>
         [...prev, created].sort((a, b) => a.nombre.localeCompare(b.nombre)),
@@ -89,6 +92,7 @@ export default function AgentesPage() {
       setAltaNombre("");
       setAltaApellido("");
       setAltaRol("");
+      setAltaEmail("");
       setShowAlta(false);
       setMessage("Agente creado.");
     } catch (error) {
@@ -107,6 +111,7 @@ export default function AgentesPage() {
     setEditNombre(agente.nombre);
     setEditApellido(agente.apellido ?? "");
     setEditRol(agente.rol_label ?? "");
+    setEditEmail(agente.email ?? "");
     setEditActivo(agente.activo);
   }
 
@@ -120,6 +125,7 @@ export default function AgentesPage() {
         nombre: editNombre.trim(),
         apellido: editApellido.trim() || null,
         rol_label: editRol.trim() || null,
+        email: editEmail.trim() || null,
         activo: editActivo,
       });
       setAgentes((prev) =>
@@ -268,6 +274,19 @@ export default function AgentesPage() {
                 disabled={creating}
               />
             </label>
+            <label className="grid gap-1.5 text-sm sm:col-span-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Correo (opcional)
+              </span>
+              <input
+                className={controlClass}
+                type="email"
+                value={altaEmail}
+                onChange={(event) => setAltaEmail(event.target.value)}
+                placeholder="juan.perez@ejemplo.com"
+                disabled={creating}
+              />
+            </label>
             <div className="sm:col-span-3">
               <button
                 type="button"
@@ -337,6 +356,19 @@ export default function AgentesPage() {
                         disabled={savingEdit}
                       />
                     </label>
+                    <label className="grid gap-1.5 text-sm sm:col-span-3">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                        Correo (opcional)
+                      </span>
+                      <input
+                        className={controlClass}
+                        type="email"
+                        value={editEmail}
+                        onChange={(event) => setEditEmail(event.target.value)}
+                        placeholder="juan.perez@ejemplo.com"
+                        disabled={savingEdit}
+                      />
+                    </label>
                     <label className="flex items-center gap-2 text-sm sm:col-span-3">
                       <input
                         type="checkbox"
@@ -386,6 +418,11 @@ export default function AgentesPage() {
                           </span>
                         ) : null}
                       </div>
+                      {agente.email ? (
+                        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+                          {agente.email}
+                        </p>
+                      ) : null}
                     </div>
                     <button
                       type="button"

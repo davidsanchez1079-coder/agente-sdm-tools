@@ -579,7 +579,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
       <section className="grid gap-3">
         <header className="flex items-baseline justify-between gap-3">
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-            Casos / oportunidades
+            Casos/Oportunidades
           </h3>
           {casesCount > 0 ? (
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
