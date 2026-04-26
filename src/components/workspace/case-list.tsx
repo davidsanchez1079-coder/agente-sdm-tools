@@ -9,6 +9,7 @@ import {
   listCases,
   type CaseRow,
 } from "@/lib/workspace/folders";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   estadoBadge,
   estadoLabel,
@@ -37,6 +38,8 @@ export function CaseList({
   refreshToken = 0,
 }: CaseListProps) {
   const [rows, setRows] = useState<CaseRow[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<CaseRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const searchParams = useSearchParams();
 
   const filters = useMemo(
@@ -77,11 +80,15 @@ export function CaseList({
     };
   }, [folderId, refreshToken, notify]);
 
-  async function handleDelete(id: string) {
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setDeleting(true);
     try {
       const supabase = getSupabaseBrowserClient();
       await deleteCase(supabase, id);
       setRows((prev) => prev.filter((row) => row.id !== id));
+      setPendingDelete(null);
       notify("Caso eliminado.");
     } catch (error) {
       notify(
@@ -89,6 +96,8 @@ export function CaseList({
           ? error.message
           : "No se pudo eliminar el caso.",
       );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -195,7 +204,7 @@ export function CaseList({
             </Link>
             <button
               type="button"
-              onClick={() => void handleDelete(row.id)}
+              onClick={() => setPendingDelete(row)}
               className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
             >
               Borrar
@@ -203,6 +212,23 @@ export function CaseList({
           </div>
         </div>
       ))}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete
+            ? `¿Borrar el caso «${pendingDelete.titulo}»?`
+            : ""
+        }
+        description="Se eliminan también los mensajes y los adjuntos. No se puede deshacer."
+        confirmLabel="Borrar caso"
+        tone="destructive"
+        busy={deleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

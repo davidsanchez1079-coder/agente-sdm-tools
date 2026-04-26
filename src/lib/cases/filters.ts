@@ -1,5 +1,4 @@
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
-import { CUSTOMERS, type CustomerId } from "@/lib/customers/customers";
 import type { CaseRow } from "@/lib/workspace/folders";
 import { operacionTipoLabel } from "./cases";
 import type { CaseEstado, CasePrioridad } from "./cases";
@@ -22,8 +21,6 @@ const VALID_BRAND_IDS: BrandId[] = BRANDS.filter(
   (brand) => brand.id !== "general",
 ).map((brand) => brand.id);
 
-const VALID_CUSTOMER_IDS: CustomerId[] = CUSTOMERS.map((customer) => customer.id);
-
 export type RapFilter = "all" | "yes" | "no";
 
 export type SortKey = "recent" | "potencial" | "prioridad";
@@ -32,7 +29,11 @@ export type CaseFilters = {
   q: string;
   estados: CaseEstado[];
   prioridades: CasePrioridad[];
-  clientes: CustomerId[];
+  // Labels de cliente. Antes era CustomerId[] (enum). Ahora son strings
+  // libres porque los clientes viven en BD y se identifican por label
+  // case-sensitive en URL (ej. ?cliente=Magna,PCNC). Comparación contra
+  // row.cliente es case-insensitive.
+  clientes: string[];
   fabricantes: BrandId[];
   rap: RapFilter;
   sort: SortKey;
@@ -74,10 +75,10 @@ export function parseFiltersFromParams(
     (value): value is CasePrioridad =>
       VALID_PRIORIDADES.includes(value as CasePrioridad),
   );
-  const clientes = splitList(params.get("cliente")).filter(
-    (value): value is CustomerId =>
-      VALID_CUSTOMER_IDS.includes(value as CustomerId),
-  );
+  // Cliente: cualquier label no vacío. La validación contra catálogo
+  // real ocurre en case-filters.tsx donde se comparan contra customers
+  // cargados de BD.
+  const clientes = splitList(params.get("cliente"));
   const fabricantes = splitList(params.get("fabricante")).filter(
     (value): value is BrandId =>
       VALID_BRAND_IDS.includes(value as BrandId),
@@ -169,15 +170,6 @@ function matchesSearch(row: CaseRow, q: string): boolean {
   );
 }
 
-function clienteLabelsFromIds(ids: CustomerId[]): Set<string> {
-  const labels = new Set<string>();
-  for (const id of ids) {
-    const customer = CUSTOMERS.find((c) => c.id === id);
-    if (customer) labels.add(customer.label.toLowerCase());
-  }
-  return labels;
-}
-
 function brandMatches(
   marcaPreferida: string | null,
   fabricantes: BrandId[],
@@ -195,7 +187,9 @@ export function applyFilters(
   rows: CaseRow[],
   filters: CaseFilters,
 ): CaseRow[] {
-  const clienteLabels = clienteLabelsFromIds(filters.clientes);
+  const clienteLabelsLower = new Set(
+    filters.clientes.map((label) => label.trim().toLowerCase()),
+  );
 
   return rows.filter((row) => {
     if (filters.estados.length && !filters.estados.includes(row.estado))
@@ -205,9 +199,10 @@ export function applyFilters(
       !filters.prioridades.includes(row.prioridad)
     )
       return false;
-    if (filters.clientes.length) {
+    if (clienteLabelsLower.size > 0) {
       if (!row.cliente) return false;
-      if (!clienteLabels.has(row.cliente.trim().toLowerCase())) return false;
+      if (!clienteLabelsLower.has(row.cliente.trim().toLowerCase()))
+        return false;
     }
     if (
       filters.fabricantes.length &&

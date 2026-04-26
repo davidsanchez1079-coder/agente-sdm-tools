@@ -7,9 +7,12 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import {
   CASE_COLUMNS,
+  deleteCase,
   updateCase,
   type CaseRow,
 } from "@/lib/workspace/folders";
+import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   BRANDS,
   ENABLED_AGENT_MODES,
@@ -102,7 +105,10 @@ function formatMessageTime(iso: string): string {
 }
 
 export function CaseDetail({ caseId }: CaseDetailProps) {
+  const router = useRouter();
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingCase, setDeletingCase] = useState(false);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -456,6 +462,25 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } finally {
       setSavingOperacion(false);
+    }
+  }
+
+  async function handleConfirmDeleteCase() {
+    if (!caseItem) return;
+    setDeletingCase(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await deleteCase(supabase, caseItem.id);
+      router.push("/app/caso");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo borrar el caso.",
+      );
+      setDeletingCase(false);
+      setConfirmDeleteOpen(false);
     }
   }
 
@@ -1328,6 +1353,24 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         </div>
       </section>
 
+      <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 dark:border-rose-500/30 dark:bg-rose-500/5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-rose-700 dark:text-rose-300">
+          Eliminar caso
+        </p>
+        <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+          Borra el caso, sus mensajes con el agente y los adjuntos. No se
+          puede deshacer.
+        </p>
+        <button
+          type="button"
+          onClick={() => setConfirmDeleteOpen(true)}
+          disabled={deletingCase}
+          className="mt-3 rounded-xl border border-rose-400 bg-white px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:bg-slate-900 dark:text-rose-200 dark:hover:bg-rose-500/10"
+        >
+          Borrar caso
+        </button>
+      </div>
+
       {message ? (
         <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-300 dark:shadow-none">
           {message}
@@ -1337,6 +1380,19 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       <AttachmentPreviewModal
         preview={preview}
         onClose={() => setPreview(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title={`¿Borrar el caso «${caseItem.titulo}»?`}
+        description="Se eliminan también los mensajes con el agente y los adjuntos. No se puede deshacer."
+        confirmLabel="Borrar caso"
+        tone="destructive"
+        busy={deletingCase}
+        onConfirm={handleConfirmDeleteCase}
+        onClose={() => {
+          if (!deletingCase) setConfirmDeleteOpen(false);
+        }}
       />
     </section>
   );

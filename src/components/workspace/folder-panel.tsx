@@ -7,6 +7,7 @@ import {
   deleteFolder,
   listFolders,
 } from "@/lib/workspace/folders";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Folder = {
   id: string;
@@ -32,6 +33,10 @@ export function FolderPanel({
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folderName, setFolderName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [pendingDelete, setPendingDelete] = useState<Folder | null>(null);
+  const [pendingDeleteCases, setPendingDeleteCases] = useState(0);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const notify = useCallback(
     (msg: string | null) => {
@@ -100,13 +105,39 @@ export function FolderPanel({
     }
   }
 
-  async function handleDelete(folderId: string) {
-    setLoading(true);
+  async function handleAskDelete(folder: Folder) {
+    setDeleteBusy(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { count, error } = await supabase
+        .from("cases")
+        .select("id", { count: "exact", head: true })
+        .eq("folder_id", folder.id);
+      if (error) throw error;
+      setPendingDelete(folder);
+      setPendingDeleteCases(count ?? 0);
+    } catch (error) {
+      notify(
+        error instanceof Error
+          ? error.message
+          : "No se pudo verificar la carpeta antes de borrar.",
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete || pendingDeleteCases > 0) return;
+    const folderId = pendingDelete.id;
+    setDeleteBusy(true);
     try {
       const supabase = getSupabaseBrowserClient();
       await deleteFolder(supabase, folderId);
       setFolders((prev) => prev.filter((folder) => folder.id !== folderId));
       if (selectedFolderId === folderId) onSelectFolder(null);
+      setPendingDelete(null);
+      setPendingDeleteCases(0);
       notify("Carpeta eliminada.");
     } catch (error) {
       notify(
@@ -115,7 +146,7 @@ export function FolderPanel({
           : "No se pudo eliminar la carpeta.",
       );
     } finally {
-      setLoading(false);
+      setDeleteBusy(false);
     }
   }
 
@@ -173,8 +204,9 @@ export function FolderPanel({
                 </button>
                 <button
                   type="button"
-                  className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                  onClick={() => void handleDelete(folder.id)}
+                  className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                  onClick={() => void handleAskDelete(folder)}
+                  disabled={deleteBusy}
                 >
                   Borrar
                 </button>
@@ -187,6 +219,35 @@ export function FolderPanel({
           </p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete
+            ? pendingDeleteCases > 0
+              ? `No se puede borrar «${pendingDelete.nombre}»`
+              : `¿Borrar la carpeta «${pendingDelete.nombre}»?`
+            : ""
+        }
+        description={
+          pendingDelete
+            ? pendingDeleteCases > 0
+              ? `Esta carpeta tiene ${pendingDeleteCases} ${pendingDeleteCases === 1 ? "caso" : "casos"}. Borra o mueve esos casos antes de borrar la carpeta.`
+              : "La carpeta está vacía. Esta acción no se puede deshacer."
+            : ""
+        }
+        confirmLabel="Borrar carpeta"
+        tone="destructive"
+        blocked={pendingDeleteCases > 0}
+        busy={deleteBusy}
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          if (!deleteBusy) {
+            setPendingDelete(null);
+            setPendingDeleteCases(0);
+          }
+        }}
+      />
     </section>
   );
 }
