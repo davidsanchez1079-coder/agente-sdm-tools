@@ -11,6 +11,7 @@ import {
   listMembers,
   memberStatus,
   regenerateInvitationToken,
+  sendInvitationEmail,
   setMemberBrands as apiSetMemberBrands,
   updateMemberActivo,
   updateMemberRol,
@@ -168,9 +169,20 @@ export default function AccesosPage() {
       setInvBrands([]);
       setShowInviteForm(false);
       await reload();
-      setMessage(
-        "Invitación creada. Copia el link y compártelo con la persona.",
-      );
+
+      // Intento de envío automático del correo. Si falla, la invitación
+      // existe en BD y el banner del link copiable arriba sirve como
+      // fallback manual.
+      try {
+        const result = await sendInvitationEmail(supabase, created.id);
+        setMessage(`Invitación enviada por correo a ${result.to}.`);
+      } catch (sendError) {
+        setMessage(
+          `Invitación creada, pero no se pudo mandar el correo automático: ${
+            sendError instanceof Error ? sendError.message : "error desconocido"
+          }. Copia el link manual y compártelo.`,
+        );
+      }
     } catch (error) {
       const code =
         error && typeof error === "object" && "code" in error
@@ -198,12 +210,38 @@ export default function AccesosPage() {
       const link = `${origin}/invitacion/${updated.invitation_token}`;
       setLastInviteLink({ memberId: updated.id, link, email: updated.email });
       await reload();
-      setMessage("Link de invitación regenerado.");
+      try {
+        const result = await sendInvitationEmail(supabase, updated.id);
+        setMessage(
+          `Link regenerado y correo enviado a ${result.to} con el nuevo token.`,
+        );
+      } catch (sendError) {
+        setMessage(
+          `Link regenerado, pero no se pudo mandar el correo: ${
+            sendError instanceof Error ? sendError.message : "error desconocido"
+          }. Copia el link manual.`,
+        );
+      }
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : "No se pudo regenerar el link.",
+      );
+    }
+  }
+
+  async function handleResend(member: WorkspaceMemberRow) {
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const result = await sendInvitationEmail(supabase, member.id);
+      setMessage(`Correo reenviado a ${result.to}.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo reenviar el correo.",
       );
     }
   }
@@ -574,6 +612,7 @@ export default function AccesosPage() {
                   void requestAction({ kind: "delete", member: m })
                 }
                 onRegenerate={() => void handleRegenerate(m)}
+                onResend={() => void handleResend(m)}
               />
             ))}
           </SectionGroup>
@@ -748,6 +787,7 @@ type MemberCardProps = {
   onDeactivate: () => void;
   onDelete: () => void;
   onRegenerate?: () => void;
+  onResend?: () => void;
 };
 
 function MemberCard(props: MemberCardProps) {
@@ -767,6 +807,7 @@ function MemberCard(props: MemberCardProps) {
     onDeactivate,
     onDelete,
     onRegenerate,
+    onResend,
   } = props;
   const status = memberStatus(member);
   const editingBrands = editingBrandsFor === member.id;
@@ -889,6 +930,15 @@ function MemberCard(props: MemberCardProps) {
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800/60">
+        {status === "pendiente" && onResend ? (
+          <button
+            type="button"
+            onClick={onResend}
+            className="rounded-lg border border-indigo-500/60 px-2.5 py-1 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-400/60 dark:text-indigo-200 dark:hover:bg-indigo-400/10"
+          >
+            Reenviar correo
+          </button>
+        ) : null}
         {status === "pendiente" && onRegenerate ? (
           <button
             type="button"

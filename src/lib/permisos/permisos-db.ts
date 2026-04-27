@@ -287,3 +287,46 @@ export async function acceptInvitation(
   if (error) throw error;
   return data as string;
 }
+
+export type SendInvitationEmailResult = {
+  sent: boolean;
+  to: string;
+  providerMessageId?: string | null;
+};
+
+// Llama al endpoint /api/invitations/send que valida gerente vía RLS,
+// renderiza la plantilla y manda por Resend. La invitación ya tiene
+// que existir en BD (createInvitation o regenerateInvitationToken).
+export async function sendInvitationEmail(
+  supabase: SupabaseClient,
+  memberId: string,
+): Promise<SendInvitationEmailResult> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sesión expirada. Vuelve a iniciar sesión.");
+
+  const response = await fetch("/api/invitations/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ memberId }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    sent?: boolean;
+    to?: string;
+    providerMessageId?: string | null;
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "No se pudo enviar el correo.");
+  }
+  return {
+    sent: Boolean(payload.sent),
+    to: payload.to ?? "",
+    providerMessageId: payload.providerMessageId ?? null,
+  };
+}
