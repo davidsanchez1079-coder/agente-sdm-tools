@@ -5,8 +5,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import {
+  CASE_CONVERSION_NIVELES,
   CASE_OPERACION_TIPOS,
   CASE_PRIORIDADES,
+  type CaseConversionNivel,
   type CaseOperacionTipo,
   type CasePrioridad,
 } from "@/lib/cases/cases";
@@ -45,6 +47,8 @@ export function CaseForm({
   const [maquina, setMaquina] = useState("");
   const [marca, setMarca] = useState<BrandId | "">("");
   const [prioridad, setPrioridad] = useState<CasePrioridad>("media");
+  const [conversionNivel, setConversionNivel] =
+    useState<CaseConversionNivel>("media");
   const [secondaryAgenteId, setSecondaryAgenteId] = useState<string>("");
   const [agentes, setAgentes] = useState<AgenteRow[]>([]);
   const [saving, setSaving] = useState(false);
@@ -98,6 +102,7 @@ export function CaseForm({
         material: material.trim() || undefined,
         maquina: maquina.trim() || undefined,
         prioridad,
+        conversionNivel,
         secondaryAgenteId: secondaryAgenteId || null,
       });
       onCreated(row);
@@ -108,6 +113,7 @@ export function CaseForm({
       setMaquina("");
       setMarca("");
       setPrioridad("media");
+      setConversionNivel("media");
       setSecondaryAgenteId("");
       onMessage?.("Caso creado.");
     } catch (error) {
@@ -192,6 +198,20 @@ export function CaseForm({
         {CASE_PRIORIDADES.map((row) => (
           <option key={row.id} value={row.id}>
             Prioridad: {row.label}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className={controlClass}
+        value={conversionNivel}
+        onChange={(event) =>
+          setConversionNivel(event.target.value as CaseConversionNivel)
+        }
+      >
+        {CASE_CONVERSION_NIVELES.map((row) => (
+          <option key={row.id} value={row.id}>
+            Conversión: {row.label}
           </option>
         ))}
       </select>

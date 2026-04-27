@@ -12,6 +12,8 @@ import {
 } from "@/lib/workspace/folders";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  conversionNivelBadge,
+  conversionNivelLabel,
   estadoBadge,
   estadoLabel,
   operacionTipoBadge,
@@ -168,6 +170,12 @@ export function CaseList({
                   className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${prioridadBadge(row.prioridad)}`}
                 >
                   {prioridadLabel(row.prioridad)}
+                </span>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${conversionNivelBadge(row.conversion_nivel)}`}
+                  title="Nivel de conversión comercial"
+                >
+                  Conv. {conversionNivelLabel(row.conversion_nivel)}
                 </span>
                 {row.operacion_tipo ? (
                   <span

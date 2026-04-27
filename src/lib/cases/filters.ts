@@ -1,7 +1,11 @@
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import type { CaseRow } from "@/lib/workspace/folders";
 import { operacionTipoLabel } from "./cases";
-import type { CaseEstado, CasePrioridad } from "./cases";
+import type {
+  CaseConversionNivel,
+  CaseEstado,
+  CasePrioridad,
+} from "./cases";
 
 const VALID_ESTADOS: CaseEstado[] = [
   "abierto",
@@ -17,18 +21,25 @@ const VALID_PRIORIDADES: CasePrioridad[] = [
   "crítica",
 ];
 
+const VALID_CONVERSION_NIVELES: CaseConversionNivel[] = [
+  "alta",
+  "media",
+  "baja",
+];
+
 const VALID_BRAND_IDS: BrandId[] = BRANDS.filter(
   (brand) => brand.id !== "general",
 ).map((brand) => brand.id);
 
 export type RapFilter = "all" | "yes" | "no";
 
-export type SortKey = "recent" | "potencial" | "prioridad";
+export type SortKey = "recent" | "potencial" | "prioridad" | "conversion";
 
 export type CaseFilters = {
   q: string;
   estados: CaseEstado[];
   prioridades: CasePrioridad[];
+  conversiones: CaseConversionNivel[];
   // Labels de cliente. Antes era CustomerId[] (enum). Ahora son strings
   // libres porque los clientes viven en BD y se identifican por label
   // case-sensitive en URL (ej. ?cliente=Magna,PCNC). Comparación contra
@@ -49,10 +60,17 @@ const PRIORIDAD_ORDER: Record<CasePrioridad, number> = {
   baja: 3,
 };
 
+const CONVERSION_ORDER: Record<CaseConversionNivel, number> = {
+  alta: 0,
+  media: 1,
+  baja: 2,
+};
+
 export const EMPTY_FILTERS: CaseFilters = {
   q: "",
   estados: [],
   prioridades: [],
+  conversiones: [],
   clientes: [],
   agentes: [],
   fabricantes: [],
@@ -79,6 +97,10 @@ export function parseFiltersFromParams(
     (value): value is CasePrioridad =>
       VALID_PRIORIDADES.includes(value as CasePrioridad),
   );
+  const conversiones = splitList(params.get("conversion")).filter(
+    (value): value is CaseConversionNivel =>
+      VALID_CONVERSION_NIVELES.includes(value as CaseConversionNivel),
+  );
   // Cliente: cualquier label no vacío. La validación contra catálogo
   // real ocurre en case-filters.tsx donde se comparan contra customers
   // cargados de BD.
@@ -95,7 +117,9 @@ export function parseFiltersFromParams(
 
   const sortRaw = params.get("sort");
   const sort: SortKey =
-    sortRaw === "potencial" || sortRaw === "prioridad"
+    sortRaw === "potencial" ||
+    sortRaw === "prioridad" ||
+    sortRaw === "conversion"
       ? sortRaw
       : "recent";
 
@@ -103,6 +127,7 @@ export function parseFiltersFromParams(
     q: (params.get("q") ?? "").trim(),
     estados,
     prioridades,
+    conversiones,
     clientes,
     agentes,
     fabricantes,
@@ -126,6 +151,10 @@ export function serializeFiltersToParams(
   if (filters.prioridades.length)
     params.set("prioridad", filters.prioridades.join(","));
   else params.delete("prioridad");
+
+  if (filters.conversiones.length)
+    params.set("conversion", filters.conversiones.join(","));
+  else params.delete("conversion");
 
   if (filters.clientes.length)
     params.set("cliente", filters.clientes.join(","));
@@ -152,6 +181,7 @@ export function countActivePanelFilters(filters: CaseFilters): number {
   return (
     filters.estados.length +
     filters.prioridades.length +
+    filters.conversiones.length +
     filters.clientes.length +
     filters.agentes.length +
     filters.fabricantes.length +
@@ -212,6 +242,11 @@ export function applyFilters(
       !filters.prioridades.includes(row.prioridad)
     )
       return false;
+    if (
+      filters.conversiones.length &&
+      !filters.conversiones.includes(row.conversion_nivel)
+    )
+      return false;
     if (clienteLabelsLower.size > 0) {
       if (!row.cliente) return false;
       if (!clienteLabelsLower.has(row.cliente.trim().toLowerCase()))
@@ -255,6 +290,16 @@ export function sortCases(rows: CaseRow[], sort: SortKey): CaseRow[] {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
       });
+    case "conversion":
+      return copy.sort((a, b) => {
+        const diff =
+          CONVERSION_ORDER[a.conversion_nivel] -
+          CONVERSION_ORDER[b.conversion_nivel];
+        if (diff !== 0) return diff;
+        return (
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
     case "recent":
     default:
       return copy.sort(
@@ -268,4 +313,5 @@ export const SORT_OPTIONS: { id: SortKey; label: string }[] = [
   { id: "recent", label: "Más recientes" },
   { id: "potencial", label: "Mayor potencial USD" },
   { id: "prioridad", label: "Prioridad crítica primero" },
+  { id: "conversion", label: "Mayor conversión primero" },
 ];
