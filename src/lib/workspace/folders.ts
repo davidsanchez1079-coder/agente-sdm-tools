@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  CaseConversionNivel,
   CaseEstado,
   CaseOperacionTipo,
   CasePrioridad,
@@ -26,6 +27,7 @@ export type CaseRow = {
   marca_preferida: string | null;
   estado: CaseEstado;
   prioridad: CasePrioridad;
+  conversion_nivel: CaseConversionNivel;
   siguiente_accion: string | null;
   resumen_ejecutivo: string | null;
   resultado_cierre: CaseResultadoCierre | null;
@@ -37,7 +39,7 @@ export type CaseRow = {
 };
 
 export const CASE_COLUMNS =
-  "id, folder_id, titulo, cliente, operacion_tipo, operacion, material, maquina, marca_preferida, estado, prioridad, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_by, secondary_agente_id, created_at";
+  "id, folder_id, titulo, cliente, operacion_tipo, operacion, material, maquina, marca_preferida, estado, prioridad, conversion_nivel, siguiente_accion, resumen_ejecutivo, resultado_cierre, requiere_rap, potencial_usd, created_by, secondary_agente_id, created_at";
 
 export async function listFolders(supabase: SupabaseClient, workspaceId: string) {
   const { data, error } = await supabase
@@ -157,6 +159,7 @@ export type CreateCaseInput = {
   material?: string;
   maquina?: string;
   prioridad?: CasePrioridad;
+  conversionNivel?: CaseConversionNivel;
   secondaryAgenteId?: string | null;
 };
 
@@ -202,6 +205,7 @@ export async function createCase(
       marca_preferida: marca,
       estado: "abierto",
       prioridad: input.prioridad ?? "media",
+      conversion_nivel: input.conversionNivel ?? "media",
       secondary_agente_id: input.secondaryAgenteId ?? null,
     })
     .select(CASE_COLUMNS)
@@ -214,6 +218,7 @@ export async function createCase(
 export type UpdateCasePatch = Partial<{
   estado: CaseEstado;
   prioridad: CasePrioridad;
+  conversion_nivel: CaseConversionNivel;
   operacion_tipo: CaseOperacionTipo | null;
   operacion: string | null;
   marca_preferida: string;

@@ -6,9 +6,12 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace/context";
 import {
   CASE_ESTADOS,
+  CASE_CONVERSION_NIVELES,
   CASE_PRIORIDADES,
   estadoLabel,
+  conversionNivelLabel,
   prioridadLabel,
+  type CaseConversionNivel,
   type CaseEstado,
   type CasePrioridad,
 } from "@/lib/cases/cases";
@@ -115,6 +118,12 @@ export function CaseFilters() {
     pushFilters({
       ...filters,
       prioridades: toggleFromArray(filters.prioridades, value),
+    });
+
+  const handleToggleConversion = (value: CaseConversionNivel) =>
+    pushFilters({
+      ...filters,
+      conversiones: toggleFromArray(filters.conversiones, value),
     });
 
   const handleToggleCliente = (label: string) =>
@@ -228,6 +237,13 @@ export function CaseFilters() {
               onRemove={() => handleTogglePrioridad(id)}
             />
           ))}
+          {filters.conversiones.map((id) => (
+            <Chip
+              key={`conversion-${id}`}
+              label={`Conversión: ${conversionNivelLabel(id)}`}
+              onRemove={() => handleToggleConversion(id)}
+            />
+          ))}
           {filters.clientes.map((label) => (
             <Chip
               key={`cliente-${label}`}
@@ -291,6 +307,22 @@ export function CaseFilters() {
                   key={row.id}
                   type="button"
                   onClick={() => handleTogglePrioridad(row.id)}
+                  className={`${pillBase} ${active ? pillActive : pillInactive}`}
+                >
+                  {row.label}
+                </button>
+              );
+            })}
+          </FilterGroup>
+
+          <FilterGroup label="Conversión">
+            {CASE_CONVERSION_NIVELES.map((row) => {
+              const active = filters.conversiones.includes(row.id);
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => handleToggleConversion(row.id)}
                   className={`${pillBase} ${active ? pillActive : pillInactive}`}
                 >
                   {row.label}

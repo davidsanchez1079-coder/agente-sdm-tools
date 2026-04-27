@@ -33,10 +33,13 @@ import {
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
 import {
+  conversionNivelBadge,
+  conversionNivelLabel,
   estadoBadge,
   estadoLabel,
   operacionTipoBadge,
   operacionTipoLabel,
+  type CaseConversionNivel,
   type CaseOperacionTipo,
 } from "@/lib/cases/cases";
 import { brandBadgeClass, brandBadgeLabel } from "@/lib/brands/brands";
@@ -50,6 +53,7 @@ type CaseRow = {
   operacion: string | null;
   material: string | null;
   marca_preferida: string | null;
+  conversion_nivel: CaseConversionNivel;
   created_at: string;
 };
 
@@ -90,7 +94,7 @@ async function reloadCases(
   const { data, error } = await supabase
     .from("cases")
     .select(
-      "id, titulo, estado, operacion_tipo, operacion, material, marca_preferida, created_at",
+      "id, titulo, estado, operacion_tipo, operacion, material, marca_preferida, conversion_nivel, created_at",
     )
     .eq("cliente", customerLabel)
     .order("created_at", { ascending: false });
@@ -159,7 +163,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           supabase
             .from("cases")
             .select(
-              "id, titulo, estado, operacion_tipo, operacion, material, marca_preferida, created_at",
+              "id, titulo, estado, operacion_tipo, operacion, material, marca_preferida, conversion_nivel, created_at",
             )
             .eq("cliente", row.label)
             .order("created_at", { ascending: false }),
@@ -617,6 +621,12 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
                         className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${brandBadgeClass(row.marca_preferida)}`}
                       >
                         {brandBadgeLabel(row.marca_preferida)}
+                      </span>
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${conversionNivelBadge(row.conversion_nivel)}`}
+                        title="Nivel de conversión comercial"
+                      >
+                        Conv. {conversionNivelLabel(row.conversion_nivel)}
                       </span>
                     </div>
                     {row.operacion ? (

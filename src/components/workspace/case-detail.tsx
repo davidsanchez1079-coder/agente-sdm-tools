@@ -27,10 +27,13 @@ import {
   type BrandId,
 } from "@/lib/brands/brands";
 import {
+  CASE_CONVERSION_NIVELES,
   CASE_ESTADOS,
   CASE_OPERACION_TIPOS,
   CASE_PRIORIDADES,
   CASE_RESULTADOS_CIERRE,
+  conversionNivelBadge,
+  conversionNivelLabel,
   estadoBadge,
   estadoLabel,
   formatPotencialUsd,
@@ -40,6 +43,7 @@ import {
   prioridadLabel,
   resultadoCierreBadge,
   resultadoCierreLabel,
+  type CaseConversionNivel,
   type CaseEstado,
   type CaseOperacionTipo,
   type CasePrioridad,
@@ -122,6 +126,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [agentes, setAgentes] = useState<AgenteRow[]>([]);
   const [savingSecondary, setSavingSecondary] = useState(false);
   const [savingMarca, setSavingMarca] = useState(false);
+  const [savingConversion, setSavingConversion] = useState(false);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -474,6 +479,26 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     }
   }
 
+  async function handleChangeConversion(value: CaseConversionNivel) {
+    if (!caseItem || caseItem.conversion_nivel === value) return;
+    setSavingConversion(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        conversion_nivel: value,
+      });
+      setCaseItem(updated);
+      setMessage("Nivel de conversión actualizado.");
+    } catch (error) {
+      setMessage(
+        formatError(error, "No se pudo actualizar el nivel de conversión."),
+      );
+    } finally {
+      setSavingConversion(false);
+    }
+  }
+
   async function handleChangeMarca(value: string) {
     if (!caseItem) return;
     const next = value.trim();
@@ -716,6 +741,12 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${prioridadBadge(caseItem.prioridad)}`}
           >
             Prioridad {prioridadLabel(caseItem.prioridad)}
+          </span>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${conversionNivelBadge(caseItem.conversion_nivel)}`}
+            title="Nivel de conversión comercial"
+          >
+            Conversión {conversionNivelLabel(caseItem.conversion_nivel)}
           </span>
           {caseItem.operacion_tipo ? (
             <span
@@ -1132,6 +1163,31 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Conversión (probabilidad comercial)
+            </span>
+            <select
+              className={controlClass}
+              value={caseItem.conversion_nivel}
+              onChange={(event) =>
+                void handleChangeConversion(
+                  event.target.value as CaseConversionNivel,
+                )
+              }
+              disabled={savingConversion}
+            >
+              {CASE_CONVERSION_NIVELES.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              Distinto de Prioridad. Mide qué tan probable es cerrar la venta.
+            </span>
           </label>
 
           <label className="grid gap-1.5 text-sm">

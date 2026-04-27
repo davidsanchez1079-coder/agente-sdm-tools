@@ -2,6 +2,8 @@ export type CaseEstado = "abierto" | "en_proceso" | "detenido" | "cerrado";
 
 export type CasePrioridad = "baja" | "media" | "alta" | "crítica";
 
+export type CaseConversionNivel = "alta" | "media" | "baja";
+
 export type CaseResultadoCierre =
   | "exito"
   | "parcial"
@@ -29,6 +31,15 @@ export const CASE_PRIORIDADES: { id: CasePrioridad; label: string }[] = [
   { id: "media", label: "Media" },
   { id: "alta", label: "Alta" },
   { id: "crítica", label: "Crítica" },
+];
+
+export const CASE_CONVERSION_NIVELES: {
+  id: CaseConversionNivel;
+  label: string;
+}[] = [
+  { id: "alta", label: "Alta" },
+  { id: "media", label: "Media" },
+  { id: "baja", label: "Baja" },
 ];
 
 export const CASE_RESULTADOS_CIERRE: {
@@ -63,6 +74,15 @@ export const ESTADO_BADGE: Record<CaseEstado, string> = {
     "border-amber-500/40 bg-amber-100 text-amber-800 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200",
   cerrado:
     "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300",
+};
+
+export const CONVERSION_NIVEL_BADGE: Record<CaseConversionNivel, string> = {
+  alta:
+    "border-emerald-500/50 bg-emerald-100 text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/15 dark:text-emerald-200",
+  media:
+    "border-violet-500/40 bg-violet-100 text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200",
+  baja:
+    "border-zinc-400/60 bg-zinc-100 text-zinc-700 dark:border-zinc-600/60 dark:bg-zinc-800/60 dark:text-zinc-300",
 };
 
 export const PRIORIDAD_BADGE: Record<CasePrioridad, string> = {
@@ -112,6 +132,12 @@ export function prioridadBadge(prioridad: string): string {
   return PRIORIDAD_BADGE[prioridad as CasePrioridad] ?? FALLBACK_BADGE;
 }
 
+export function conversionNivelBadge(nivel: string): string {
+  return (
+    CONVERSION_NIVEL_BADGE[nivel as CaseConversionNivel] ?? FALLBACK_BADGE
+  );
+}
+
 export function resultadoCierreBadge(resultado: string): string {
   return (
     RESULTADO_CIERRE_BADGE[resultado as CaseResultadoCierre] ?? FALLBACK_BADGE
@@ -133,6 +159,14 @@ export function prioridadLabel(prioridad: string): string {
   return (
     CASE_PRIORIDADES.find((row) => row.id === (prioridad as CasePrioridad))
       ?.label ?? prioridad
+  );
+}
+
+export function conversionNivelLabel(nivel: string): string {
+  return (
+    CASE_CONVERSION_NIVELES.find(
+      (row) => row.id === (nivel as CaseConversionNivel),
+    )?.label ?? nivel
   );
 }
 
