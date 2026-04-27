@@ -142,10 +142,21 @@ export default function AcceptInvitationPage() {
       await acceptInvitation(supabase, token);
       router.replace("/app");
     } catch (error) {
+      console.error("acceptInvitation failed", error);
+      const parts: string[] = [];
+      if (error && typeof error === "object") {
+        const e = error as Record<string, unknown>;
+        if (typeof e.code === "string" && e.code) parts.push(`[${e.code}]`);
+        if (typeof e.message === "string" && e.message) parts.push(e.message);
+        if (typeof e.details === "string" && e.details)
+          parts.push(`details: ${e.details}`);
+        if (typeof e.hint === "string" && e.hint)
+          parts.push(`hint: ${e.hint}`);
+      }
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo aceptar la invitación.",
+        parts.length > 0
+          ? `No se pudo aceptar la invitación. ${parts.join(" ")}`
+          : `No se pudo aceptar la invitación. ${String(error)}`,
       );
       setWorking(null);
     }
