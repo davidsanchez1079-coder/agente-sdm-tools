@@ -63,7 +63,7 @@ function brandLabel(brandId: string): string {
   return BRANDS.find((b) => b.id === brandId)?.label ?? brandId;
 }
 
-const ASIGNABLES = BRANDS.filter((b) => b.id !== "general");
+const ASIGNABLES = BRANDS.filter((b) => b.id !== "general" && b.id !== "otro");
 
 type PendingAction =
   | { kind: "delete"; member: WorkspaceMemberRow }

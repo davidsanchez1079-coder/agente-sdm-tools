@@ -22,6 +22,8 @@ import {
 import {
   BRANDS,
   ENABLED_AGENT_MODES,
+  brandBadgeClass,
+  brandBadgeLabel,
   type BrandId,
 } from "@/lib/brands/brands";
 import {
@@ -722,6 +724,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
               {operacionTipoLabel(caseItem.operacion_tipo)}
             </span>
           ) : null}
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${brandBadgeClass(caseItem.marca_preferida)}`}
+          >
+            {brandBadgeLabel(caseItem.marca_preferida)}
+          </span>
           {caseItem.cliente ? (
             <span className="rounded-full border border-cyan-500/40 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-800 dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200">
               {caseItem.cliente}
