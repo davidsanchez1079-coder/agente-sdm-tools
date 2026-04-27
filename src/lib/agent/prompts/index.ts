@@ -16,7 +16,7 @@ export type SystemBlock = {
   cache_control?: { type: "ephemeral" };
 };
 
-const BRAND_PROFILES: Record<Exclude<BrandId, "general">, string> = {
+const BRAND_PROFILES: Record<Exclude<BrandId, "general" | "otro">, string> = {
   sandvik: SANDVIK_PROFILE,
   vargus: VARGUS_PROFILE,
   korloy: KORLOY_PROFILE,
@@ -25,7 +25,7 @@ const BRAND_PROFILES: Record<Exclude<BrandId, "general">, string> = {
 };
 
 function buildModeBlock(mode: BrandId): string {
-  if (mode === "general") return GENERAL_MODE_RULES;
+  if (mode === "general" || mode === "otro") return GENERAL_MODE_RULES;
   return `${SPECIALIST_COMMON_RULES}\n\n${BRAND_PROFILES[mode]}`;
 }
 

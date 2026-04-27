@@ -39,6 +39,7 @@ import {
   operacionTipoLabel,
   type CaseOperacionTipo,
 } from "@/lib/cases/cases";
+import { brandBadgeClass, brandBadgeLabel } from "@/lib/brands/brands";
 import { formatError } from "@/lib/errors/format";
 
 type CaseRow = {
@@ -48,6 +49,7 @@ type CaseRow = {
   operacion_tipo: CaseOperacionTipo | null;
   operacion: string | null;
   material: string | null;
+  marca_preferida: string | null;
   created_at: string;
 };
 
@@ -88,7 +90,7 @@ async function reloadCases(
   const { data, error } = await supabase
     .from("cases")
     .select(
-      "id, titulo, estado, operacion_tipo, operacion, material, created_at",
+      "id, titulo, estado, operacion_tipo, operacion, material, marca_preferida, created_at",
     )
     .eq("cliente", customerLabel)
     .order("created_at", { ascending: false });
@@ -157,7 +159,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           supabase
             .from("cases")
             .select(
-              "id, titulo, estado, operacion_tipo, operacion, material, created_at",
+              "id, titulo, estado, operacion_tipo, operacion, material, marca_preferida, created_at",
             )
             .eq("cliente", row.label)
             .order("created_at", { ascending: false }),
@@ -611,6 +613,11 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
                           {operacionTipoLabel(row.operacion_tipo)}
                         </span>
                       ) : null}
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${brandBadgeClass(row.marca_preferida)}`}
+                      >
+                        {brandBadgeLabel(row.marca_preferida)}
+                      </span>
                     </div>
                     {row.operacion ? (
                       <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">

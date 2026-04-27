@@ -4,7 +4,8 @@ export type BrandId =
   | "vargus"
   | "korloy"
   | "dormer"
-  | "amec";
+  | "amec"
+  | "otro";
 
 export type BrandStatus = "always" | "indexed" | "coming_soon";
 
@@ -56,10 +57,36 @@ export const BRANDS: readonly Brand[] = [
     description:
       "Especialista Amec. Enfocado a taladrado modular y entero.",
   },
+  {
+    id: "otro",
+    label: "Otro / no clasificado",
+    status: "always",
+    description:
+      "Caso sin fabricante identificado todavía o con marca fuera del catálogo. No es asignable como marca de externo: los externos no ven cases marcados como otro a menos que exista una regla explícita posterior.",
+  },
 ] as const;
 
 export function getBrand(id: BrandId) {
   return BRANDS.find((brand) => brand.id === id) ?? BRANDS[0];
+}
+
+export function brandBadgeLabel(brandId: string | null | undefined): string {
+  if (!brandId) return "Sin marca";
+  const id = brandId.trim().toLowerCase();
+  if (id === "otro") return "OTRO";
+  const match = BRANDS.find((b) => b.id === id || b.label.toLowerCase() === id);
+  return match?.label ?? brandId.toUpperCase();
+}
+
+export function brandBadgeClass(brandId: string | null | undefined): string {
+  const id = brandId?.trim().toLowerCase();
+  if (!id) {
+    return "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200";
+  }
+  if (id === "otro") {
+    return "border-amber-500/40 bg-amber-100 text-amber-800 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200";
+  }
+  return "border-fuchsia-500/40 bg-fuchsia-100 text-fuchsia-800 dark:border-fuchsia-400/40 dark:bg-fuchsia-500/15 dark:text-fuchsia-200";
 }
 
 // Modos del agente habilitados. Cada modo tiene su propio prompt en

@@ -26,6 +26,7 @@ import {
   sortCases,
 } from "@/lib/cases/filters";
 import { formatPotencialUsd } from "@/lib/cases/cases";
+import { brandBadgeClass, brandBadgeLabel } from "@/lib/brands/brands";
 import { formatError } from "@/lib/errors/format";
 
 type CaseListProps = {
@@ -175,6 +176,11 @@ export function CaseList({
                     {operacionTipoLabel(row.operacion_tipo)}
                   </span>
                 ) : null}
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${brandBadgeClass(row.marca_preferida)}`}
+                >
+                  {brandBadgeLabel(row.marca_preferida)}
+                </span>
                 {row.requiere_rap ? (
                   <span className="rounded-full border border-violet-500/40 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-violet-800 dark:border-violet-400/40 dark:bg-violet-500/15 dark:text-violet-200">
                     RAP
