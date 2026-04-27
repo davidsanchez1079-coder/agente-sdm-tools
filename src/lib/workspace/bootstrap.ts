@@ -23,9 +23,12 @@ async function resolveWorkspaceRol(
   appUserId: string,
   workspace: WorkspaceRow,
 ): Promise<WorkspaceRol> {
-  if (workspace.user_id === appUserId) return "gerente";
+  if (workspace.user_id === appUserId) {
+    console.log("[GOTIA-DEBUG] resolveWorkspaceRol: owner of workspace", { appUserId, workspace });
+    return "gerente";
+  }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("workspace_members")
     .select("rol")
     .eq("workspace_id", workspace.id)
@@ -33,6 +36,14 @@ async function resolveWorkspaceRol(
     .eq("activo", true)
     .maybeSingle<{ rol: WorkspaceRol }>();
 
+  console.log("[GOTIA-DEBUG] resolveWorkspaceRol: lookup workspace_members", {
+    appUserId,
+    workspaceId: workspace.id,
+    workspaceOwner: workspace.user_id,
+    rowFound: data,
+    rolResolved: data?.rol ?? "externo (fallback)",
+    error: error ? { code: error.code, message: error.message } : null,
+  });
   return data?.rol ?? "externo";
 }
 
@@ -85,11 +96,18 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
   const primaryRes = await supabase.rpc("get_primary_workspace_for_user", {
     user_id_input: appUser.id,
   });
+  console.log("[GOTIA-DEBUG] bootstrap: get_primary_workspace_for_user RPC", {
+    appUserId: appUser.id,
+    appUserEmail: appUser.email,
+    error: primaryRes.error ? { code: primaryRes.error.code, message: primaryRes.error.message } : null,
+    rows: primaryRes.data,
+  });
   if (!primaryRes.error && primaryRes.data) {
     const rows = primaryRes.data as unknown as WorkspaceRow[];
     if (rows.length > 0) {
       const workspace = rows[0];
       const workspaceRol = await resolveWorkspaceRol(supabase, appUser.id, workspace);
+      console.log("[GOTIA-DEBUG] bootstrap: returning via RPC path", { workspace, workspaceRol });
       return { appUser, workspace, workspaceRol };
     }
   }
@@ -107,6 +125,7 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
   if (workspaceError) throw workspaceError;
 
   if (existingWorkspace) {
+    console.log("[GOTIA-DEBUG] bootstrap: returning via FALLBACK existing-workspace path (forced gerente)", { existingWorkspace, appUserId: appUser.id });
     return { appUser, workspace: existingWorkspace, workspaceRol: "gerente" as WorkspaceRol };
   }
 
@@ -118,5 +137,6 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
 
   if (insertWorkspaceError) throw insertWorkspaceError;
 
+  console.log("[GOTIA-DEBUG] bootstrap: returning via FALLBACK new-workspace path (forced gerente)", { insertedWorkspace, appUserId: appUser.id });
   return { appUser, workspace: insertedWorkspace, workspaceRol: "gerente" as WorkspaceRol };
 }
