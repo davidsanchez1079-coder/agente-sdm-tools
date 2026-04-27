@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useWorkspace } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
+import { NoAccess } from "@/components/layout/no-access";
 import {
   agenteFullName,
   countAgenteUsage,
@@ -21,7 +22,9 @@ import {
 import { ModuleIcon } from "@/components/ui/module-icon";
 
 export default function AgentesPage() {
+  const isExterno = useIsExterno();
   const { workspaceId } = useWorkspace();
+  if (isExterno) return <NoAccess titulo="Catálogo de agentes" />;
   const [agentes, setAgentes] = useState<AgenteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);

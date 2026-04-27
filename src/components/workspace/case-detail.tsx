@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useIsExterno } from "@/lib/workspace/context";
 import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import {
   CASE_COLUMNS,
@@ -111,6 +112,7 @@ function formatMessageTime(iso: string): string {
 
 export function CaseDetail({ caseId }: CaseDetailProps) {
   const router = useRouter();
+  const isExterno = useIsExterno();
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingCase, setDeletingCase] = useState(false);
@@ -747,6 +749,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       </div>
 
       {/* Chat — espacio de trabajo primario */}
+      {!isExterno ? (
       <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-6 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <AgentModeSelect
           value={agentMode}
@@ -940,6 +943,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           />
         </div>
       </div>
+      ) : null}
 
       <div className="grid gap-2">
         {messages.length ? (
@@ -1054,6 +1058,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       </div>
 
       {/* Ficha operativa — datos del caso para consulta y seguimiento */}
+      {!isExterno ? (
+      <>
       <div className="flex items-center gap-3 pt-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
           Ficha operativa
@@ -1445,6 +1451,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           Borrar caso
         </button>
       </div>
+      </>
+      ) : null}
 
       {message ? (
         <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-300 dark:shadow-none">

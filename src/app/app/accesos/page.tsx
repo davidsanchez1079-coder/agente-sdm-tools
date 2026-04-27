@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useWorkspace } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
+import { NoAccess } from "@/components/layout/no-access";
 import {
   countActiveGerentes,
   createInvitation,
@@ -75,7 +76,9 @@ type PendingAction =
   | null;
 
 export default function AccesosPage() {
+  const isExterno = useIsExterno();
   const { workspaceId } = useWorkspace();
+  if (isExterno) return <NoAccess titulo="Accesos" />;
   const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
   const [memberBrands, setMemberBrands] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);

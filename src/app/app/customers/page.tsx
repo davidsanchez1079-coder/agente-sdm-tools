@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useWorkspace } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import {
   createCustomer,
   listCustomers,
@@ -43,6 +43,7 @@ const STATUS_BADGE: Record<CustomerEstatus, string> = {
 };
 
 export default function CustomersPage() {
+  const isExterno = useIsExterno();
   const router = useRouter();
   const { workspaceId } = useWorkspace();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
@@ -180,6 +181,7 @@ export default function CustomersPage() {
         </p>
       </header>
 
+      {!isExterno ? (
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -292,6 +294,7 @@ export default function CustomersPage() {
           </div>
         ) : null}
       </div>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">

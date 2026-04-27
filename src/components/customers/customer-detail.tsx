@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useIsExterno } from "@/lib/workspace/context";
 import {
   countCasesForCustomerLabel,
   deleteCustomer,
@@ -100,6 +101,7 @@ type CustomerDetailProps = {
 
 export function CustomerDetail({ customerId }: CustomerDetailProps) {
   const router = useRouter();
+  const isExterno = useIsExterno();
 
   const [customer, setCustomer] = useState<CustomerRow | null>(null);
   const [cases, setCases] = useState<CaseRow[]>([]);
@@ -377,6 +379,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
         />
       </div>
 
+      {!isExterno ? (
       <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <header>
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
@@ -545,7 +548,9 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           ) : null}
         </div>
       </div>
+      ) : null}
 
+      {!isExterno ? (
       <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <header>
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
@@ -575,6 +580,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           onMessage={setMessage}
         />
       </section>
+      ) : null}
 
       <section className="grid gap-3">
         <header className="flex items-baseline justify-between gap-3">
@@ -640,6 +646,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
         )}
       </section>
 
+      {!isExterno ? (
       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 dark:border-rose-500/30 dark:bg-rose-500/5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-rose-700 dark:text-rose-300">
           Eliminar cliente
@@ -657,6 +664,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
           Borrar cliente
         </button>
       </div>
+      ) : null}
 
       {message ? (
         <div className="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/60 dark:text-slate-300 dark:shadow-none">

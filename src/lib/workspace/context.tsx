@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import type { WorkspaceRol } from "@/lib/workspace/bootstrap";
 
 export type AppUser = {
   id: string;
@@ -13,6 +14,7 @@ export type AppUser = {
 export type WorkspaceContextValue = {
   appUser: AppUser;
   workspaceId: string;
+  workspaceRol: WorkspaceRol;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -37,4 +39,14 @@ export function useWorkspace() {
     throw new Error("useWorkspace debe usarse dentro de WorkspaceProvider");
   }
   return ctx;
+}
+
+export function useIsExterno() {
+  const { workspaceRol } = useWorkspace();
+  return workspaceRol === "externo";
+}
+
+export function useCanManage() {
+  const { workspaceRol } = useWorkspace();
+  return workspaceRol === "gerente";
 }

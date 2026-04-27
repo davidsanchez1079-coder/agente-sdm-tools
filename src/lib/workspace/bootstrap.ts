@@ -1,5 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
+export type WorkspaceRol = "gerente" | "interno" | "externo";
+
 type AppUserRow = {
   id: string;
   auth_user_id: string;
@@ -15,6 +17,24 @@ type WorkspaceRow = {
   id: string;
   user_id: string;
 };
+
+async function resolveWorkspaceRol(
+  supabase: SupabaseClient,
+  appUserId: string,
+  workspace: WorkspaceRow,
+): Promise<WorkspaceRol> {
+  if (workspace.user_id === appUserId) return "gerente";
+
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("rol")
+    .eq("workspace_id", workspace.id)
+    .eq("user_id", appUserId)
+    .eq("activo", true)
+    .maybeSingle<{ rol: WorkspaceRol }>();
+
+  return data?.rol ?? "externo";
+}
 
 function deriveNameParts(email: string) {
   const local = email.split("@")[0] ?? "usuario";
@@ -68,7 +88,9 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
   if (!primaryRes.error && primaryRes.data) {
     const rows = primaryRes.data as unknown as WorkspaceRow[];
     if (rows.length > 0) {
-      return { appUser, workspace: rows[0] };
+      const workspace = rows[0];
+      const workspaceRol = await resolveWorkspaceRol(supabase, appUser.id, workspace);
+      return { appUser, workspace, workspaceRol };
     }
   }
 
@@ -85,7 +107,7 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
   if (workspaceError) throw workspaceError;
 
   if (existingWorkspace) {
-    return { appUser, workspace: existingWorkspace };
+    return { appUser, workspace: existingWorkspace, workspaceRol: "gerente" as WorkspaceRol };
   }
 
   const { data: insertedWorkspace, error: insertWorkspaceError } = await supabase
@@ -96,5 +118,5 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
 
   if (insertWorkspaceError) throw insertWorkspaceError;
 
-  return { appUser, workspace: insertedWorkspace };
+  return { appUser, workspace: insertedWorkspace, workspaceRol: "gerente" as WorkspaceRol };
 }
