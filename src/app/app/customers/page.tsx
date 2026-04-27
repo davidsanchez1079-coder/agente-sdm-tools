@@ -23,6 +23,7 @@ import {
   MODULE_ICON_BG,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
+import { formatError } from "@/lib/errors/format";
 
 const ESTATUS_LABEL: Record<CustomerEstatus, string> = {
   activo: "Activo",
@@ -84,9 +85,7 @@ export default function CustomersPage() {
       } catch (error) {
         if (!cancelled) {
           setMessage(
-            error instanceof Error
-              ? error.message
-              : "No se pudo cargar el catálogo de clientes.",
+            formatError(error, "No se pudo cargar el catálogo de clientes."),
           );
         }
       } finally {

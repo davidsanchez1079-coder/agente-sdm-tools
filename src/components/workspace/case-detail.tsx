@@ -64,6 +64,7 @@ import {
   uploadAttachment,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
+import { formatError } from "@/lib/errors/format";
 
 type CaseDetailProps = {
   caseId: string;
@@ -213,9 +214,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       } catch (error) {
         if (!cancelled) {
           setMessage(
-            error instanceof Error
-              ? error.message
-              : "No se pudo cargar el caso.",
+            formatError(error, "No se pudo cargar el caso."),
           );
         }
       } finally {
@@ -254,9 +253,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setPreview({ row, url });
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo abrir el adjunto.",
+        formatError(error, "No se pudo abrir el adjunto."),
       );
     }
   }
@@ -282,11 +279,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         setAttachments(current);
         newlyUploaded.push(row.id);
       } catch (error) {
-        setUploadError(
-          error instanceof Error
-            ? error.message
-            : `Error al subir "${file.name}".`,
-        );
+        setUploadError(formatError(error, `Error al subir "${file.name}".`));
       }
     }
     if (newlyUploaded.length > 0) {
@@ -318,9 +311,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Resumen ejecutivo guardado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar el resumen.",
+        formatError(error, "No se pudo guardar el resumen."),
       );
     } finally {
       setSavingResumen(false);
@@ -340,9 +331,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Siguiente acción guardada.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar la siguiente acción.",
+        formatError(error, "No se pudo guardar la siguiente acción."),
       );
     } finally {
       setSavingSiguiente(false);
@@ -360,9 +349,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Estado actualizado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo actualizar el estado.",
+        formatError(error, "No se pudo actualizar el estado."),
       );
     } finally {
       setSavingEstado(false);
@@ -380,9 +367,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Prioridad actualizada.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo actualizar la prioridad.",
+        formatError(error, "No se pudo actualizar la prioridad."),
       );
     } finally {
       setSavingPrioridad(false);
@@ -404,9 +389,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Resultado de cierre actualizado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo actualizar el resultado de cierre.",
+        formatError(error, "No se pudo actualizar el resultado de cierre."),
       );
     } finally {
       setSavingResultado(false);
@@ -435,9 +418,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Potencial USD guardado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar el potencial.",
+        formatError(error, "No se pudo guardar el potencial."),
       );
     } finally {
       setSavingPotencial(false);
@@ -459,9 +440,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Tipo de operación actualizado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo actualizar el tipo de operación.",
+        formatError(error, "No se pudo actualizar el tipo de operación."),
       );
     } finally {
       setSavingOperacionTipo(false);
@@ -485,9 +464,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Detalle de operación guardado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar el detalle de operación.",
+        formatError(error, "No se pudo guardar el detalle de operación."),
       );
     } finally {
       setSavingOperacion(false);
@@ -509,9 +486,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Agente secundario actualizado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo actualizar el agente secundario.",
+        formatError(error, "No se pudo actualizar el agente secundario."),
       );
     } finally {
       setSavingSecondary(false);
@@ -528,9 +503,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       router.push("/app/caso");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo borrar el caso.",
+        formatError(error, "No se pudo borrar el caso."),
       );
       setDeletingCase(false);
       setConfirmDeleteOpen(false);
@@ -554,9 +527,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo actualizar el flag de RAP.",
+        formatError(error, "No se pudo actualizar el flag de RAP."),
       );
     } finally {
       setSavingRap(false);
@@ -619,9 +590,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       setMessage("Mensaje guardado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo enviar el mensaje.",
+        formatError(error, "No se pudo enviar el mensaje."),
       );
     } finally {
       setSending(false);

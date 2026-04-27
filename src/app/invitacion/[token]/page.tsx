@@ -9,6 +9,7 @@ import {
   type InvitationPreview,
   type WorkspaceMemberRol,
 } from "@/lib/permisos/permisos-db";
+import { formatError } from "@/lib/errors/format";
 
 const ROL_LABEL: Record<WorkspaceMemberRol, string> = {
   gerente: "Gerente",
@@ -61,9 +62,7 @@ export default function AcceptInvitationPage() {
       } catch (error) {
         if (!cancelled) {
           setPreviewError(
-            error instanceof Error
-              ? error.message
-              : "No se pudo leer la invitación.",
+            formatError(error, "No se pudo leer la invitación."),
           );
         }
       } finally {
@@ -103,9 +102,7 @@ export default function AcceptInvitationPage() {
       }
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo crear la cuenta.",
+        formatError(error, "No se pudo crear la cuenta."),
       );
       setWorking(null);
     }
@@ -125,9 +122,7 @@ export default function AcceptInvitationPage() {
       await runAccept();
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo iniciar sesión.",
+        formatError(error, "No se pudo iniciar sesión."),
       );
       setWorking(null);
     }

@@ -39,6 +39,7 @@ import {
   operacionTipoLabel,
   type CaseOperacionTipo,
 } from "@/lib/cases/cases";
+import { formatError } from "@/lib/errors/format";
 
 type CaseRow = {
   id: string;
@@ -170,9 +171,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
       } catch (error) {
         if (!cancelled) {
           setMessage(
-            error instanceof Error
-              ? error.message
-              : "No se pudo cargar el cliente.",
+            formatError(error, "No se pudo cargar el cliente."),
           );
         }
       } finally {
@@ -268,9 +267,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
       setMessage("Cliente actualizado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar el cliente.",
+        formatError(error, "No se pudo guardar el cliente."),
       );
     } finally {
       setSaving(false);
@@ -293,9 +290,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
       setConfirmOpen(true);
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo verificar el cliente antes de borrar.",
+        formatError(error, "No se pudo verificar el cliente antes de borrar."),
       );
     } finally {
       setConfirmBusy(false);
@@ -311,9 +306,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
       router.push("/app/customers");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo borrar el cliente.",
+        formatError(error, "No se pudo borrar el cliente."),
       );
       setConfirmBusy(false);
       setConfirmOpen(false);
@@ -571,9 +564,7 @@ export function CustomerDetail({ customerId }: CustomerDetailProps) {
               setCases(refreshed);
             } catch (error) {
               setMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Caso creado, pero no se pudo refrescar la lista.",
+                formatError(error, "Caso creado, pero no se pudo refrescar la lista."),
               );
             }
           }}
