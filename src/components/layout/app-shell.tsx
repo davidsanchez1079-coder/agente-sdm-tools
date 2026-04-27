@@ -135,10 +135,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     return null;
   }
 
-  const { appUser, workspaceRol } = state.value;
+  const { appUser, workspaceRol, workspaceId } = state.value;
   const displayName =
     [appUser.nombre, appUser.apellido].filter(Boolean).join(" ").trim() ||
     appUser.email;
+
+  const debugBadgeColor =
+    workspaceRol === "externo"
+      ? "bg-amber-500"
+      : workspaceRol === "interno"
+        ? "bg-cyan-500"
+        : "bg-rose-500";
 
   return (
     <WorkspaceProvider value={state.value}>
@@ -157,6 +164,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
           {children}
         </main>
+        <div
+          className={`fixed bottom-3 right-3 z-50 rounded-lg px-3 py-2 font-mono text-[10px] font-semibold text-white shadow-lg ${debugBadgeColor}`}
+          style={{ pointerEvents: "none" }}
+        >
+          rol={workspaceRol} · ws={workspaceId.slice(0, 8)} · me={appUser.id.slice(0, 8)}
+        </div>
       </div>
     </WorkspaceProvider>
   );
