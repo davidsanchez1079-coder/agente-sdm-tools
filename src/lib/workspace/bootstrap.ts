@@ -59,6 +59,23 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
     appUser = insertedUser;
   }
 
+  // Prefer primary workspace via RPC: owned > membered. Esto cubre a
+  // invitees (que NO tienen workspace propio pero sí membresía en el
+  // del gerente que los invitó) y a workspace owners (que ven el suyo).
+  const primaryRes = await supabase.rpc("get_primary_workspace_for_user", {
+    user_id_input: appUser.id,
+  });
+  if (!primaryRes.error && primaryRes.data) {
+    const rows = primaryRes.data as unknown as WorkspaceRow[];
+    if (rows.length > 0) {
+      return { appUser, workspace: rows[0] };
+    }
+  }
+
+  // Fallback: comportamiento original. Si por alguna razón la RPC no
+  // existe todavía (migración aún no aplicada) o falla, intentamos
+  // resolver el workspace propio directamente. Y si no existe, lo
+  // creamos.
   const { data: existingWorkspace, error: workspaceError } = await supabase
     .from("workspaces")
     .select("id, user_id")
