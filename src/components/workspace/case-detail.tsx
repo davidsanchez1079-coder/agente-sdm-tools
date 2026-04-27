@@ -119,6 +119,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [deletingCase, setDeletingCase] = useState(false);
   const [agentes, setAgentes] = useState<AgenteRow[]>([]);
   const [savingSecondary, setSavingSecondary] = useState(false);
+  const [savingMarca, setSavingMarca] = useState(false);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -468,6 +469,30 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } finally {
       setSavingOperacion(false);
+    }
+  }
+
+  async function handleChangeMarca(value: string) {
+    if (!caseItem) return;
+    const next = value.trim();
+    if (!next) return;
+    if ((caseItem.marca_preferida ?? "") === next) return;
+    setSavingMarca(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        marca_preferida: next,
+      });
+      setCaseItem(updated);
+      setAgentMode(deriveAgentMode(updated.marca_preferida));
+      setMessage("Fabricante actualizado.");
+    } catch (error) {
+      setMessage(
+        formatError(error, "No se pudo actualizar el fabricante."),
+      );
+    } finally {
+      setSavingMarca(false);
     }
   }
 
@@ -1100,6 +1125,33 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+              Fabricante {!caseItem.marca_preferida ? <span className="text-amber-600 dark:text-amber-300">(obligatorio)</span> : null}
+            </span>
+            <select
+              className={`${controlClass} ${!caseItem.marca_preferida ? "border-amber-400 dark:border-amber-500/60" : ""}`}
+              value={caseItem.marca_preferida ?? ""}
+              onChange={(event) => void handleChangeMarca(event.target.value)}
+              disabled={savingMarca}
+              required
+            >
+              <option value="" disabled>
+                — Selecciona fabricante —
+              </option>
+              {BRANDS.filter((b) => b.id !== "general").map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+            {!caseItem.marca_preferida ? (
+              <span className="text-xs text-amber-600 dark:text-amber-300">
+                Este caso no tiene fabricante. Asignalo para que externos con esa marca puedan verlo.
+              </span>
+            ) : null}
           </label>
         </div>
       </div>

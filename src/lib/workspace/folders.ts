@@ -151,11 +151,11 @@ export async function listCases(supabase: SupabaseClient, folderId: string) {
 export type CreateCaseInput = {
   titulo: string;
   cliente: string;
+  marcaPreferida: string;
   operacionTipo?: CaseOperacionTipo;
   operacion?: string;
   material?: string;
   maquina?: string;
-  marcaPreferida?: string;
   prioridad?: CasePrioridad;
   secondaryAgenteId?: string | null;
 };
@@ -176,6 +176,13 @@ export async function createCase(
     );
   }
 
+  const marca = input.marcaPreferida.trim();
+  if (!marca) {
+    throw new Error(
+      "Falta el fabricante. Cada caso debe tener una marca asignada.",
+    );
+  }
+
   const folderId = await ensureFolderForCustomer(
     supabase,
     workspaceId,
@@ -192,7 +199,7 @@ export async function createCase(
       operacion: input.operacion || null,
       material: input.material || null,
       maquina: input.maquina || null,
-      marca_preferida: input.marcaPreferida || null,
+      marca_preferida: marca,
       estado: "abierto",
       prioridad: input.prioridad ?? "media",
       secondary_agente_id: input.secondaryAgenteId ?? null,
@@ -209,6 +216,7 @@ export type UpdateCasePatch = Partial<{
   prioridad: CasePrioridad;
   operacion_tipo: CaseOperacionTipo | null;
   operacion: string | null;
+  marca_preferida: string;
   siguiente_accion: string | null;
   resumen_ejecutivo: string | null;
   resultado_cierre: CaseResultadoCierre | null;
