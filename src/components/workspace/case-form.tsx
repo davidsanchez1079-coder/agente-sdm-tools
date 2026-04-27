@@ -81,8 +81,10 @@ export function CaseForm({
     };
   }, [workspaceId]);
 
+  const canSubmit = !!titulo.trim() && !!customerLabel && !!marca;
+
   async function handleSubmit() {
-    if (!titulo.trim() || !customerLabel) return;
+    if (!canSubmit) return;
     setSaving(true);
     onMessage?.(null);
     try {
@@ -90,11 +92,11 @@ export function CaseForm({
       const row = await createCase(supabase, workspaceId, {
         titulo: titulo.trim(),
         cliente: customerLabel,
+        marcaPreferida: marca,
         operacionTipo: operacionTipo || undefined,
         operacion: operacion.trim() || undefined,
         material: material.trim() || undefined,
         maquina: maquina.trim() || undefined,
-        marcaPreferida: marca.trim() || undefined,
         prioridad,
         secondaryAgenteId: secondaryAgenteId || null,
       });
@@ -164,17 +166,23 @@ export function CaseForm({
       />
 
       <select
-        className={controlClass}
+        className={`${controlClass} ${!marca ? "border-amber-400 dark:border-amber-500/60" : ""}`}
         value={marca}
         onChange={(event) => setMarca(event.target.value as BrandId | "")}
+        required
       >
-        <option value="">Sin fabricante</option>
+        <option value="">— Selecciona fabricante (obligatorio) —</option>
         {FABRICANTES.map((brand) => (
           <option key={brand.id} value={brand.id}>
             {brand.label}
           </option>
         ))}
       </select>
+      {!marca ? (
+        <span className="text-xs text-amber-600 dark:text-amber-300">
+          El fabricante es obligatorio. Sin marca el caso no aparece para externos asignados a esa marca.
+        </span>
+      ) : null}
 
       <select
         className={controlClass}
@@ -205,7 +213,7 @@ export function CaseForm({
       <button
         type="button"
         onClick={() => void handleSubmit()}
-        disabled={saving || !titulo.trim()}
+        disabled={saving || !canSubmit}
         className="rounded-xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:shadow-none dark:hover:bg-cyan-300"
       >
         {saving ? "Creando…" : `Crear caso para ${customerLabel}`}
