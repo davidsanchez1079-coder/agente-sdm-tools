@@ -7,6 +7,7 @@ import {
   listCustomers,
   type CustomerRow,
 } from "@/lib/customers/customers-db";
+import { useIsExterno } from "@/lib/workspace/context";
 import { formatError } from "@/lib/errors/format";
 
 type CustomerPanelProps = {
@@ -18,6 +19,7 @@ type CustomerPanelProps = {
 // /app/caso. Lista clientes con conteo de casos, "Sin cliente" entry
 // para casos legacy sin cliente, y un atajo al catálogo para alta.
 export function CustomerPanel({ workspaceId, onMessage }: CustomerPanelProps) {
+  const isExterno = useIsExterno();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [unassignedCount, setUnassignedCount] = useState(0);
@@ -36,6 +38,7 @@ export function CustomerPanel({ workspaceId, onMessage }: CustomerPanelProps) {
         if (cancelled) return;
 
         const acc: Record<string, number> = {};
+        const visibleClienteSet = new Set<string>();
         let unassigned = 0;
         for (const row of (casesRes.data ?? []) as {
           cliente: string | null;
@@ -45,9 +48,20 @@ export function CustomerPanel({ workspaceId, onMessage }: CustomerPanelProps) {
             unassigned += 1;
             continue;
           }
-          acc[name.toLowerCase()] = (acc[name.toLowerCase()] ?? 0) + 1;
+          const key = name.toLowerCase();
+          acc[key] = (acc[key] ?? 0) + 1;
+          visibleClienteSet.add(key);
         }
-        setCustomers(list);
+
+        // Para externo: solo mostrar clientes que tengan al menos un caso
+        // visible. Usa el set de clientes presentes en las cases que ya
+        // pasaron el filtro RLS (filtrado por marca para externos). Para
+        // gerente/interno se mantiene el catalogo completo.
+        const visibleCustomers = isExterno
+          ? list.filter((c) => visibleClienteSet.has(c.label.toLowerCase()))
+          : list;
+
+        setCustomers(visibleCustomers);
         setCounts(acc);
         setUnassignedCount(unassigned);
       } catch (error) {
@@ -63,7 +77,7 @@ export function CustomerPanel({ workspaceId, onMessage }: CustomerPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, onMessage]);
+  }, [workspaceId, onMessage, isExterno]);
 
   return (
     <section className="grid min-w-0 gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:p-5 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">

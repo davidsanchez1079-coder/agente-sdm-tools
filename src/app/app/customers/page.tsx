@@ -71,16 +71,25 @@ export default function CustomersPage() {
         if (casesRes.error) throw casesRes.error;
         if (cancelled) return;
 
-        setCustomers(list);
-
         const acc: Record<string, number> = {};
+        const visibleClienteSet = new Set<string>();
         for (const row of (casesRes.data ?? []) as {
           cliente: string | null;
         }[]) {
           const name = row.cliente?.trim();
           if (!name) continue;
-          acc[name.toLowerCase()] = (acc[name.toLowerCase()] ?? 0) + 1;
+          const key = name.toLowerCase();
+          acc[key] = (acc[key] ?? 0) + 1;
+          visibleClienteSet.add(key);
         }
+
+        // Externo: filtrar el catalogo a clientes con al menos un caso
+        // visible. Usa el set derivado de cases ya filtrado por RLS.
+        const visibleCustomers = isExterno
+          ? list.filter((c) => visibleClienteSet.has(c.label.toLowerCase()))
+          : list;
+
+        setCustomers(visibleCustomers);
         setCounts(acc);
       } catch (error) {
         if (!cancelled) {
@@ -95,7 +104,7 @@ export default function CustomersPage() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId]);
+  }, [workspaceId, isExterno]);
 
   const altaPotencialRaw = altaPotencial.trim().replace(/[,\s]/g, "");
   const altaPotencialNum =
