@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       }
 
       try {
-        const { appUser, workspace } = await ensureWorkspaceForUser(
+        const { appUser, workspace, workspaceRol } = await ensureWorkspaceForUser(
           supabase,
           sessionData.session.user,
         );
@@ -61,6 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               rol: appUser.rol,
             },
             workspaceId: workspace.id,
+            workspaceRol,
           },
         });
       } catch (error) {
@@ -134,7 +135,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return null;
   }
 
-  const { appUser } = state.value;
+  const { appUser, workspaceRol } = state.value;
   const displayName =
     [appUser.nombre, appUser.apellido].filter(Boolean).join(" ").trim() ||
     appUser.email;
@@ -145,6 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sidebar
           userName={displayName}
           email={appUser.email}
+          workspaceRol={workspaceRol}
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed((value) => !value)}
           theme={theme}

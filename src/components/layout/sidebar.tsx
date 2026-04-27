@@ -9,6 +9,7 @@ import {
   type ModuleId,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
+import type { WorkspaceRol } from "@/lib/workspace/bootstrap";
 
 const NAV_ORDER: ModuleId[] = [
   "dashboard",
@@ -20,9 +21,17 @@ const NAV_ORDER: ModuleId[] = [
   "brands",
 ];
 
+const EXTERNO_ALLOWED: ReadonlySet<ModuleId> = new Set([
+  "dashboard",
+  "usuario",
+  "customers",
+  "caso",
+]);
+
 type SidebarProps = {
   userName: string;
   email: string;
+  workspaceRol: WorkspaceRol;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   theme: "light" | "dark";
@@ -37,6 +46,7 @@ function isActive(pathname: string, href: string) {
 export function Sidebar({
   userName,
   email,
+  workspaceRol,
   collapsed,
   onToggleCollapsed,
   theme,
@@ -44,6 +54,10 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const visibleNav =
+    workspaceRol === "externo"
+      ? NAV_ORDER.filter((id) => EXTERNO_ALLOWED.has(id))
+      : NAV_ORDER;
 
   async function handleLogout() {
     const supabase = getSupabaseBrowserClient();
@@ -87,7 +101,7 @@ export function Sidebar({
         </div>
 
         <nav className="flex flex-col gap-1">
-          {NAV_ORDER.map((id) => {
+          {visibleNav.map((id) => {
             const item = MODULES[id];
             const active = isActive(pathname, item.href);
             const base =
@@ -186,7 +200,7 @@ export function Sidebar({
       </header>
 
       <nav className="sticky top-[3.25rem] z-10 flex gap-1 overflow-x-auto border-b border-slate-200 bg-white/80 px-3 py-2 lg:hidden dark:border-slate-800/80 dark:bg-slate-900/60">
-        {NAV_ORDER.map((id) => {
+        {visibleNav.map((id) => {
           const item = MODULES[id];
           const active = isActive(pathname, item.href);
           return (

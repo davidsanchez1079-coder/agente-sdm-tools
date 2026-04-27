@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useWorkspace } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import {
   MODULES,
   MODULE_ARROW,
@@ -47,11 +47,21 @@ const TILES: {
   },
 ];
 
+const EXTERNO_TILE_IDS: ReadonlySet<ModuleId> = new Set([
+  "caso",
+  "customers",
+  "usuario",
+]);
+
 export default function DashboardPage() {
+  const isExterno = useIsExterno();
   const { appUser, workspaceId } = useWorkspace();
   const displayName =
     [appUser.nombre, appUser.apellido].filter(Boolean).join(" ").trim() ||
     appUser.email;
+  const visibleTiles = isExterno
+    ? TILES.filter((t) => EXTERNO_TILE_IDS.has(t.id))
+    : TILES;
 
   return (
     <section className="grid gap-7">
@@ -73,7 +83,7 @@ export default function DashboardPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {TILES.map(({ id, description }) => {
+        {visibleTiles.map(({ id, description }) => {
           const meta = MODULES[id];
           return (
             <Link

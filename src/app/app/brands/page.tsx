@@ -7,6 +7,8 @@ import {
   MODULE_ICON_BG,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
+import { useIsExterno } from "@/lib/workspace/context";
+import { NoAccess } from "@/components/layout/no-access";
 
 const STATUS_LABEL: Record<BrandStatus, string> = {
   always: "Siempre disponible",
@@ -26,6 +28,8 @@ const STATUS_STYLE: Record<BrandStatus, string> = {
 const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 
 export default function BrandsPage() {
+  const isExterno = useIsExterno();
+  if (isExterno) return <NoAccess titulo="Marcas" />;
   return (
     <section className="grid gap-6">
       <header

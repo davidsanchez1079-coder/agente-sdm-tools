@@ -1,5 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
+export type WorkspaceRol = "gerente" | "interno" | "externo";
+
 type AppUserRow = {
   id: string;
   auth_user_id: string;
@@ -15,6 +17,24 @@ type WorkspaceRow = {
   id: string;
   user_id: string;
 };
+
+async function resolveWorkspaceRol(
+  supabase: SupabaseClient,
+  appUserId: string,
+  workspace: WorkspaceRow,
+): Promise<WorkspaceRol> {
+  if (workspace.user_id === appUserId) return "gerente";
+
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("rol")
+    .eq("workspace_id", workspace.id)
+    .eq("user_id", appUserId)
+    .eq("activo", true)
+    .maybeSingle<{ rol: WorkspaceRol }>();
+
+  return data?.rol ?? "externo";
+}
 
 function deriveNameParts(email: string) {
   const local = email.split("@")[0] ?? "usuario";
@@ -59,6 +79,25 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
     appUser = insertedUser;
   }
 
+  // Prefer primary workspace via RPC: owned > membered. Esto cubre a
+  // invitees (que NO tienen workspace propio pero sí membresía en el
+  // del gerente que los invitó) y a workspace owners (que ven el suyo).
+  const primaryRes = await supabase.rpc("get_primary_workspace_for_user", {
+    user_id_input: appUser.id,
+  });
+  if (!primaryRes.error && primaryRes.data) {
+    const rows = primaryRes.data as unknown as WorkspaceRow[];
+    if (rows.length > 0) {
+      const workspace = rows[0];
+      const workspaceRol = await resolveWorkspaceRol(supabase, appUser.id, workspace);
+      return { appUser, workspace, workspaceRol };
+    }
+  }
+
+  // Fallback: comportamiento original. Si por alguna razón la RPC no
+  // existe todavía (migración aún no aplicada) o falla, intentamos
+  // resolver el workspace propio directamente. Y si no existe, lo
+  // creamos.
   const { data: existingWorkspace, error: workspaceError } = await supabase
     .from("workspaces")
     .select("id, user_id")
@@ -68,7 +107,7 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
   if (workspaceError) throw workspaceError;
 
   if (existingWorkspace) {
-    return { appUser, workspace: existingWorkspace };
+    return { appUser, workspace: existingWorkspace, workspaceRol: "gerente" as WorkspaceRol };
   }
 
   const { data: insertedWorkspace, error: insertWorkspaceError } = await supabase
@@ -79,5 +118,5 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
 
   if (insertWorkspaceError) throw insertWorkspaceError;
 
-  return { appUser, workspace: insertedWorkspace };
+  return { appUser, workspace: insertedWorkspace, workspaceRol: "gerente" as WorkspaceRol };
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useIsExterno } from "@/lib/workspace/context";
 import {
   deleteCase,
   listCasesByCustomer,
@@ -40,6 +41,7 @@ export function CaseList({
   onMessage,
   refreshToken = 0,
 }: CaseListProps) {
+  const isExterno = useIsExterno();
   const [rows, setRows] = useState<CaseRow[]>([]);
   const [pendingDelete, setPendingDelete] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -205,6 +207,7 @@ export function CaseList({
                 </p>
               ) : null}
             </Link>
+            {!isExterno ? (
             <button
               type="button"
               onClick={() => setPendingDelete(row)}
@@ -212,6 +215,7 @@ export function CaseList({
             >
               Borrar
             </button>
+            ) : null}
           </div>
         </div>
       ))}
