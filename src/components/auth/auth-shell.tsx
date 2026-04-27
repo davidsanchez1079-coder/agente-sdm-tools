@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
-import { isAllowedEmail } from "@/lib/auth/allowed-emails";
+import { isEmailAllowedForSignIn } from "@/lib/auth/allowed-emails";
 
 export function AuthShell() {
   const env = getClientEnv();
@@ -40,15 +40,17 @@ export function AuthShell() {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    if (!isAllowedEmail(normalizedEmail)) {
-      setMessage(
-        "Acceso restringido. Este correo no está autorizado para entrar.",
-      );
-      return;
-    }
-
     setLoading(mode);
     setMessage(null);
+
+    const allowed = await isEmailAllowedForSignIn(supabase, normalizedEmail);
+    if (!allowed) {
+      setMessage(
+        "Este correo no tiene acceso al sistema. Pide a un gerente que te invite por correo desde la pestaña Accesos.",
+      );
+      setLoading(null);
+      return;
+    }
 
     const response =
       mode === "signup"
