@@ -27,6 +27,7 @@ import {
   MODULE_ICON_BG,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
+import { formatError } from "@/lib/errors/format";
 
 const ROL_LABEL: Record<WorkspaceMemberRol, string> = {
   gerente: "Gerente",
@@ -132,9 +133,7 @@ export default function AccesosPage() {
       } catch (error) {
         if (!cancelled) {
           setMessage(
-            error instanceof Error
-              ? error.message
-              : "No se pudo cargar el catálogo de accesos.",
+            formatError(error, "No se pudo cargar el catálogo de accesos."),
           );
         }
       } finally {
@@ -194,9 +193,7 @@ export default function AccesosPage() {
       const msg =
         code === "23505"
           ? "Ya existe una persona con ese correo en este workspace."
-          : error instanceof Error
-            ? error.message
-            : "No se pudo crear la invitación.";
+          : formatError(error, "No se pudo crear la invitación.");
       setMessage(msg);
     } finally {
       setInviting(false);
@@ -227,9 +224,7 @@ export default function AccesosPage() {
       }
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo regenerar el link.",
+        formatError(error, "No se pudo regenerar el link."),
       );
     }
   }
@@ -242,9 +237,7 @@ export default function AccesosPage() {
       setMessage(`Correo reenviado a ${result.to}.`);
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo reenviar el correo.",
+        formatError(error, "No se pudo reenviar el correo."),
       );
     }
   }
@@ -276,9 +269,7 @@ export default function AccesosPage() {
       setMessage("Marcas actualizadas.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudieron guardar las marcas.",
+        formatError(error, "No se pudieron guardar las marcas."),
       );
     } finally {
       setSavingBrands(false);
@@ -350,9 +341,7 @@ export default function AccesosPage() {
       setPendingAction(null);
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo aplicar la acción.",
+        formatError(error, "No se pudo aplicar la acción."),
       );
     } finally {
       setActionBusy(false);

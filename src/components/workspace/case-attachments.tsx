@@ -7,6 +7,7 @@ import {
   deleteAttachment,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
+import { formatError } from "@/lib/errors/format";
 
 type CaseAttachmentsProps = {
   attachments: AttachmentRow[];
@@ -34,9 +35,7 @@ export function CaseAttachments({
       onChange(attachments.filter((r) => r.id !== row.id));
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo eliminar el adjunto.",
+        formatError(error, "No se pudo eliminar el adjunto."),
       );
     }
   }

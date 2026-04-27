@@ -7,6 +7,7 @@ import {
   listCustomers,
   type CustomerRow,
 } from "@/lib/customers/customers-db";
+import { formatError } from "@/lib/errors/format";
 
 type CustomerPanelProps = {
   workspaceId: string;
@@ -52,9 +53,7 @@ export function CustomerPanel({ workspaceId, onMessage }: CustomerPanelProps) {
       } catch (error) {
         if (!cancelled) {
           onMessage?.(
-            error instanceof Error
-              ? error.message
-              : "No se pudo cargar el panel de clientes.",
+            formatError(error, "No se pudo cargar el panel de clientes."),
           );
         }
       } finally {

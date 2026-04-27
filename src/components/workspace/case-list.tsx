@@ -26,6 +26,7 @@ import {
   sortCases,
 } from "@/lib/cases/filters";
 import { formatPotencialUsd } from "@/lib/cases/cases";
+import { formatError } from "@/lib/errors/format";
 
 type CaseListProps = {
   // null = todos los casos del workspace (RLS scopea).
@@ -71,9 +72,7 @@ export function CaseList({
       } catch (error) {
         if (!cancelled) {
           notify(
-            error instanceof Error
-              ? error.message
-              : "No se pudieron cargar los casos.",
+            formatError(error, "No se pudieron cargar los casos."),
           );
         }
       } finally {
@@ -97,9 +96,7 @@ export function CaseList({
       notify("Caso eliminado.");
     } catch (error) {
       notify(
-        error instanceof Error
-          ? error.message
-          : "No se pudo eliminar el caso.",
+        formatError(error, "No se pudo eliminar el caso."),
       );
     } finally {
       setDeleting(false);

@@ -20,6 +20,7 @@ import {
   MODULE_ICON_BG,
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
+import { formatError } from "@/lib/errors/format";
 
 export default function AgentesPage() {
   const isExterno = useIsExterno();
@@ -61,9 +62,7 @@ export default function AgentesPage() {
       } catch (error) {
         if (!cancelled) {
           setMessage(
-            error instanceof Error
-              ? error.message
-              : "No se pudo cargar el catálogo de agentes.",
+            formatError(error, "No se pudo cargar el catálogo de agentes."),
           );
         }
       } finally {
@@ -100,9 +99,7 @@ export default function AgentesPage() {
       setMessage("Agente creado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo crear el agente.",
+        formatError(error, "No se pudo crear el agente."),
       );
     } finally {
       setCreating(false);
@@ -140,9 +137,7 @@ export default function AgentesPage() {
       setMessage("Agente actualizado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo guardar el agente.",
+        formatError(error, "No se pudo guardar el agente."),
       );
     } finally {
       setSavingEdit(false);
@@ -159,9 +154,7 @@ export default function AgentesPage() {
       setPendingUsage(usage);
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo verificar el agente antes de borrar.",
+        formatError(error, "No se pudo verificar el agente antes de borrar."),
       );
     } finally {
       setDeleting(false);
@@ -181,9 +174,7 @@ export default function AgentesPage() {
       setMessage("Agente borrado.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "No se pudo borrar el agente.",
+        formatError(error, "No se pudo borrar el agente."),
       );
     } finally {
       setDeleting(false);

@@ -15,6 +15,7 @@ import {
   listAgentes,
   type AgenteRow,
 } from "@/lib/agentes/agentes-db";
+import { formatError } from "@/lib/errors/format";
 
 type CaseFormProps = {
   workspaceId: string;
@@ -109,9 +110,7 @@ export function CaseForm({
       onMessage?.("Caso creado.");
     } catch (error) {
       onMessage?.(
-        error instanceof Error
-          ? error.message
-          : "No se pudo crear el caso.",
+        formatError(error, "No se pudo crear el caso."),
       );
     } finally {
       setSaving(false);
