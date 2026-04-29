@@ -4,7 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useIsExterno } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
+import {
+  addShare,
+  listActiveShares,
+  listShareableInternos,
+  revokeShare,
+  updateSharePermission,
+  type CaseSharePermission,
+  type CaseShareRow,
+  type ShareableInterno,
+} from "@/lib/cases/shares";
 import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import {
   CASE_COLUMNS,
@@ -120,6 +130,7 @@ function formatMessageTime(iso: string): string {
 export function CaseDetail({ caseId }: CaseDetailProps) {
   const router = useRouter();
   const isExterno = useIsExterno();
+  const { appUser, workspaceRol } = useWorkspace();
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingCase, setDeletingCase] = useState(false);
@@ -127,6 +138,13 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [savingSecondary, setSavingSecondary] = useState(false);
   const [savingMarca, setSavingMarca] = useState(false);
   const [savingConversion, setSavingConversion] = useState(false);
+  const [shares, setShares] = useState<CaseShareRow[]>([]);
+  const [shareableInternos, setShareableInternos] = useState<ShareableInterno[]>([]);
+  const [shareDraftMember, setShareDraftMember] = useState<string>("");
+  const [shareDraftPermission, setShareDraftPermission] = useState<CaseSharePermission>("edit");
+  const [addingShare, setAddingShare] = useState(false);
+  const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
+  const [updatingShareId, setUpdatingShareId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -216,6 +234,18 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
               if (!cancelled) setAgentes(list);
             } catch {
               // Silencioso: si falla, el selector queda vacío.
+            }
+            try {
+              const [activeShares, shareables] = await Promise.all([
+                listActiveShares(supabase, caseId),
+                listShareableInternos(supabase, folderRes.data.workspace_id),
+              ]);
+              if (!cancelled) {
+                setShares(activeShares);
+                setShareableInternos(shareables);
+              }
+            } catch {
+              // Silencioso: si falla, no mostramos sharing pero no rompemos el caso.
             }
           }
         }
@@ -542,6 +572,70 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } finally {
       setSavingSecondary(false);
+    }
+  }
+
+  async function handleAddShare() {
+    if (!caseItem || !shareDraftMember) return;
+    const target = shareableInternos.find((m) => m.member_id === shareDraftMember);
+    if (!target) return;
+    setAddingShare(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const newShare = await addShare(
+        supabase,
+        caseItem.id,
+        target,
+        appUser.id,
+        shareDraftPermission,
+      );
+      setShares((prev) => {
+        const filtered = prev.filter((s) => s.id !== newShare.id);
+        return [newShare, ...filtered];
+      });
+      setShareDraftMember("");
+      setShareDraftPermission("edit");
+      setMessage(
+        `Caso compartido con ${target.display_name} (${shareDraftPermission === "edit" ? "ver y editar" : "solo ver"}).`,
+      );
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo compartir el caso."));
+    } finally {
+      setAddingShare(false);
+    }
+  }
+
+  async function handleUpdateSharePermission(
+    shareId: string,
+    permission: CaseSharePermission,
+  ) {
+    setUpdatingShareId(shareId);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateSharePermission(supabase, shareId, permission);
+      setShares((prev) => prev.map((s) => (s.id === shareId ? updated : s)));
+      setMessage("Permiso actualizado.");
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo actualizar el permiso."));
+    } finally {
+      setUpdatingShareId(null);
+    }
+  }
+
+  async function handleRevokeShare(shareId: string) {
+    setRevokingShareId(shareId);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await revokeShare(supabase, shareId);
+      setShares((prev) => prev.filter((s) => s.id !== shareId));
+      setMessage("Acceso revocado.");
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo revocar el acceso."));
+    } finally {
+      setRevokingShareId(null);
     }
   }
 
@@ -1517,6 +1611,132 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           />
         </div>
       </section>
+
+      {(workspaceRol === "gerente" || (workspaceRol === "interno" && caseItem.created_by === appUser.id)) ? (
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Colaboradores
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Internos del workspace con acceso a este caso. Pueden ver, editar, enviar mensajes y subir adjuntos.
+          </p>
+        </div>
+
+        {shares.length > 0 ? (
+          <div className="grid gap-1.5">
+            {shares.map((s) => {
+              const member = shareableInternos.find((m) => m.member_id === s.shared_with_member_id);
+              const label = member?.display_name ?? s.shared_with_email;
+              const isUpdating = updatingShareId === s.id;
+              return (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-800/80 dark:bg-slate-900/60"
+                >
+                  <div className="min-w-0 flex-1 truncate text-slate-800 dark:text-slate-200">
+                    {label}
+                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                      {s.shared_with_email}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <select
+                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      value={s.permission}
+                      onChange={(event) =>
+                        void handleUpdateSharePermission(
+                          s.id,
+                          event.target.value as CaseSharePermission,
+                        )
+                      }
+                      disabled={isUpdating || revokingShareId === s.id}
+                    >
+                      <option value="view">Solo ver</option>
+                      <option value="edit">Ver y editar</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleRevokeShare(s.id)}
+                      disabled={revokingShareId === s.id || isUpdating}
+                      className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                    >
+                      {revokingShareId === s.id ? "Revocando…" : "Revocar"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Aún no se ha compartido este caso con nadie.
+          </p>
+        )}
+
+        <div className="grid gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/40 p-3 dark:border-slate-700 dark:bg-slate-900/30">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Compartir con un interno
+          </span>
+          <select
+            className={controlClass}
+            value={shareDraftMember}
+            onChange={(event) => setShareDraftMember(event.target.value)}
+            disabled={addingShare}
+          >
+            <option value="">— Selecciona un interno —</option>
+            {shareableInternos
+              .filter(
+                (m) =>
+                  !shares.some((s) => s.shared_with_member_id === m.member_id),
+              )
+              .map((m) => (
+                <option key={m.member_id} value={m.member_id}>
+                  {m.display_name} — {m.email}
+                </option>
+              ))}
+          </select>
+          <fieldset className="flex flex-wrap items-center gap-3 text-xs text-slate-700 dark:text-slate-300">
+            <legend className="sr-only">Nivel de permiso</legend>
+            <label className="inline-flex items-center gap-1.5">
+              <input
+                type="radio"
+                name="share-permission"
+                value="view"
+                checked={shareDraftPermission === "view"}
+                onChange={() => setShareDraftPermission("view")}
+                disabled={addingShare}
+              />
+              Solo ver
+            </label>
+            <label className="inline-flex items-center gap-1.5">
+              <input
+                type="radio"
+                name="share-permission"
+                value="edit"
+                checked={shareDraftPermission === "edit"}
+                onChange={() => setShareDraftPermission("edit")}
+                disabled={addingShare}
+              />
+              Ver y editar
+            </label>
+          </fieldset>
+          <button
+            type="button"
+            onClick={() => void handleAddShare()}
+            disabled={addingShare || !shareDraftMember}
+            className="rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-400 dark:text-slate-950 dark:hover:bg-cyan-300"
+          >
+            {addingShare ? "Compartiendo…" : "Compartir"}
+          </button>
+          {shareableInternos.length === 0 ? (
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              No hay internos activos en el workspace todavía.
+            </span>
+          ) : null}
+        </div>
+      </div>
+      ) : null}
 
       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 dark:border-rose-500/30 dark:bg-rose-500/5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-rose-700 dark:text-rose-300">
