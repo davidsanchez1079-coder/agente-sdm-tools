@@ -13,12 +13,17 @@ export type CaseShareRow = {
   permission: CaseSharePermission;
 };
 
-export type ShareableInterno = {
+export type ShareableMember = {
   member_id: string;
   user_id: string;
   email: string;
   display_name: string;
+  rol: "gerente" | "interno" | "externo";
 };
+
+// Alias retrocompatible. Quitar cuando todos los consumidores migren.
+export type ShareableInterno = ShareableMember;
+
 
 const SHARE_COLUMNS =
   "id, case_id, shared_with_email, shared_with_member_id, shared_by, shared_at, revoked_at, permission";
@@ -38,15 +43,14 @@ export async function listActiveShares(
   return data ?? [];
 }
 
-export async function listShareableInternos(
+export async function listShareableMembers(
   supabase: SupabaseClient,
   workspaceId: string,
-): Promise<ShareableInterno[]> {
+): Promise<ShareableMember[]> {
   const { data, error } = await supabase
     .from("workspace_members")
-    .select("id, user_id, email, users!inner(id, nombre, apellido, email)")
+    .select("id, user_id, email, rol, users!inner(id, nombre, apellido, email)")
     .eq("workspace_id", workspaceId)
-    .eq("rol", "interno")
     .eq("activo", true)
     .not("user_id", "is", null)
     .not("joined_at", "is", null);
@@ -55,6 +59,7 @@ export async function listShareableInternos(
     id: string;
     user_id: string;
     email: string;
+    rol: "gerente" | "interno" | "externo";
     users: { id: string; nombre: string; apellido: string | null; email: string } | null;
   };
   const rows = (data ?? []) as unknown as Row[];
@@ -66,15 +71,19 @@ export async function listShareableInternos(
       member_id: r.id,
       user_id: r.user_id,
       email: r.email,
+      rol: r.rol,
       display_name: fullName || r.email,
     };
   });
 }
 
+// Alias retrocompatible.
+export const listShareableInternos = listShareableMembers;
+
 export async function addShare(
   supabase: SupabaseClient,
   caseId: string,
-  member: ShareableInterno,
+  member: ShareableMember,
   sharedByUserId: string,
   permission: CaseSharePermission,
 ): Promise<CaseShareRow> {

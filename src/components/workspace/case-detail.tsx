@@ -8,12 +8,12 @@ import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import {
   addShare,
   listActiveShares,
-  listShareableInternos,
+  listShareableMembers,
   revokeShare,
   updateSharePermission,
   type CaseSharePermission,
   type CaseShareRow,
-  type ShareableInterno,
+  type ShareableMember,
 } from "@/lib/cases/shares";
 import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import {
@@ -139,7 +139,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [savingMarca, setSavingMarca] = useState(false);
   const [savingConversion, setSavingConversion] = useState(false);
   const [shares, setShares] = useState<CaseShareRow[]>([]);
-  const [shareableInternos, setShareableInternos] = useState<ShareableInterno[]>([]);
+  const [shareableMembers, setShareableMembers] = useState<ShareableMember[]>([]);
   const [shareDraftMember, setShareDraftMember] = useState<string>("");
   const [shareDraftPermission, setShareDraftPermission] = useState<CaseSharePermission>("edit");
   const [addingShare, setAddingShare] = useState(false);
@@ -238,11 +238,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             try {
               const [activeShares, shareables] = await Promise.all([
                 listActiveShares(supabase, caseId),
-                listShareableInternos(supabase, folderRes.data.workspace_id),
+                listShareableMembers(supabase, folderRes.data.workspace_id),
               ]);
               if (!cancelled) {
                 setShares(activeShares);
-                setShareableInternos(shareables);
+                setShareableMembers(shareables);
               }
             } catch {
               // Silencioso: si falla, no mostramos sharing pero no rompemos el caso.
@@ -577,7 +577,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
   async function handleAddShare() {
     if (!caseItem || !shareDraftMember) return;
-    const target = shareableInternos.find((m) => m.member_id === shareDraftMember);
+    const target = shareableMembers.find((m) => m.member_id === shareDraftMember);
     if (!target) return;
     setAddingShare(true);
     setMessage(null);
@@ -1619,14 +1619,14 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             Colaboradores
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Internos del workspace con acceso a este caso. Pueden ver, editar, enviar mensajes y subir adjuntos.
+            Miembros del workspace con acceso explícito a este caso. El permiso (solo ver / ver y editar) se aplica sobre lo que ya permite su rol.
           </p>
         </div>
 
         {shares.length > 0 ? (
           <div className="grid gap-1.5">
             {shares.map((s) => {
-              const member = shareableInternos.find((m) => m.member_id === s.shared_with_member_id);
+              const member = shareableMembers.find((m) => m.member_id === s.shared_with_member_id);
               const label = member?.display_name ?? s.shared_with_email;
               const isUpdating = updatingShareId === s.id;
               return (
@@ -1676,7 +1676,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
 
         <div className="grid gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/40 p-3 dark:border-slate-700 dark:bg-slate-900/30">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-            Compartir con un interno
+            Compartir con un miembro del workspace
           </span>
           <select
             className={controlClass}
@@ -1684,15 +1684,15 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             onChange={(event) => setShareDraftMember(event.target.value)}
             disabled={addingShare}
           >
-            <option value="">— Selecciona un interno —</option>
-            {shareableInternos
+            <option value="">— Selecciona miembro —</option>
+            {shareableMembers
               .filter(
                 (m) =>
                   !shares.some((s) => s.shared_with_member_id === m.member_id),
               )
               .map((m) => (
                 <option key={m.member_id} value={m.member_id}>
-                  {m.display_name} — {m.email}
+                  {m.display_name} ({m.rol === "gerente" ? "Gerente" : m.rol === "interno" ? "Interno" : "Externo"}) — {m.email}
                 </option>
               ))}
           </select>
@@ -1729,9 +1729,9 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           >
             {addingShare ? "Compartiendo…" : "Compartir"}
           </button>
-          {shareableInternos.length === 0 ? (
+          {shareableMembers.length === 0 ? (
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              No hay internos activos en el workspace todavía.
+              No hay miembros activos en el workspace todavía.
             </span>
           ) : null}
         </div>
