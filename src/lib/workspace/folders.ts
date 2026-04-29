@@ -123,6 +123,7 @@ export async function listCasesByCustomer(
   let query = supabase
     .from("cases")
     .select(CASE_COLUMNS)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (customerLabel === "") {
@@ -143,6 +144,7 @@ export async function listCases(supabase: SupabaseClient, folderId: string) {
     .from("cases")
     .select(CASE_COLUMNS)
     .eq("folder_id", folderId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .returns<CaseRow[]>();
 
@@ -246,7 +248,42 @@ export async function updateCase(
   return data;
 }
 
+// Soft delete: marca el caso como borrado pero deja la fila para
+// permitir restauración via Papelera (gerente). Auto-purga después
+// de 15 días vía pg_cron.
 export async function deleteCase(supabase: SupabaseClient, caseId: string) {
+  const { error } = await supabase
+    .from("cases")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", caseId);
+  if (error) throw error;
+}
+
+export async function restoreCase(supabase: SupabaseClient, caseId: string) {
+  const { error } = await supabase
+    .from("cases")
+    .update({ deleted_at: null })
+    .eq("id", caseId);
+  if (error) throw error;
+}
+
+// Borrado definitivo (skip de papelera). Solo usar desde la papelera
+// como acción explícita "Borrar definitivamente".
+export async function deleteCasePermanently(
+  supabase: SupabaseClient,
+  caseId: string,
+) {
   const { error } = await supabase.from("cases").delete().eq("id", caseId);
   if (error) throw error;
+}
+
+export async function listTrashedCases(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("cases")
+    .select(CASE_COLUMNS + ", deleted_at")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .returns<(CaseRow & { deleted_at: string })[]>();
+  if (error) throw error;
+  return data;
 }

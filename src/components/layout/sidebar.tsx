@@ -126,6 +126,24 @@ export function Sidebar({
               </Link>
             );
           })}
+          {workspaceRol === "gerente" ? (
+            <Link
+              href="/app/papelera"
+              title={collapsed ? "Papelera" : undefined}
+              className={`rounded-xl text-sm transition flex items-center border gap-3 ${
+                isActive(pathname, "/app/papelera")
+                  ? "border-rose-500/40 bg-rose-50 text-rose-800 dark:border-rose-400/40 dark:bg-rose-500/15 dark:text-rose-200"
+                  : "border-transparent text-slate-700 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-800 dark:hover:bg-slate-900/80"
+              } ${collapsed ? "h-10 w-full justify-center px-0" : "px-3 py-2 pl-4"}`}
+            >
+              <span aria-hidden className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-base">
+                🗑
+              </span>
+              {collapsed ? null : (
+                <span className="truncate font-medium">Papelera</span>
+              )}
+            </Link>
+          ) : null}
         </nav>
 
         <div className="mt-auto grid gap-2 border-t border-slate-200 pt-4 dark:border-slate-800/70">

@@ -7,6 +7,7 @@ import {
   deleteAttachment,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatError } from "@/lib/errors/format";
 
 type CaseAttachmentsProps = {
@@ -27,16 +28,23 @@ export function CaseAttachments({
   onOpen,
 }: CaseAttachmentsProps) {
   const [message, setMessage] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AttachmentRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  async function handleDelete(row: AttachmentRow) {
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      await deleteAttachment(supabase, row);
-      onChange(attachments.filter((r) => r.id !== row.id));
+      await deleteAttachment(supabase, pendingDelete);
+      onChange(attachments.filter((r) => r.id !== pendingDelete.id));
+      setPendingDelete(null);
     } catch (error) {
       setMessage(
         formatError(error, "No se pudo eliminar el adjunto."),
       );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -111,7 +119,7 @@ export function CaseAttachments({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDelete(row)}
+                  onClick={() => setPendingDelete(row)}
                   className="text-xs text-rose-600 transition hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
                 >
                   Borrar
@@ -127,6 +135,19 @@ export function CaseAttachments({
           {message}
         </p>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `¿Borrar el adjunto «${pendingDelete.filename}»?` : ""}
+        description="Se borra el archivo del bucket y la fila de la BD. No se puede deshacer."
+        confirmLabel="Borrar adjunto"
+        tone="destructive"
+        busy={deleting}
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }
