@@ -24,6 +24,7 @@ export type ShareableMember = {
 // Alias retrocompatible. Quitar cuando todos los consumidores migren.
 export type ShareableInterno = ShareableMember;
 
+
 const SHARE_COLUMNS =
   "id, case_id, shared_with_email, shared_with_member_id, shared_by, shared_at, revoked_at, permission";
 
