@@ -145,6 +145,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [addingShare, setAddingShare] = useState(false);
   const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
   const [updatingShareId, setUpdatingShareId] = useState<string | null>(null);
+  const [pendingRevokeShare, setPendingRevokeShare] = useState<CaseShareRow | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -624,7 +625,9 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     }
   }
 
-  async function handleRevokeShare(shareId: string) {
+  async function handleConfirmRevokeShare() {
+    if (!pendingRevokeShare) return;
+    const shareId = pendingRevokeShare.id;
     setRevokingShareId(shareId);
     setMessage(null);
     try {
@@ -632,6 +635,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       await revokeShare(supabase, shareId);
       setShares((prev) => prev.filter((s) => s.id !== shareId));
       setMessage("Acceso revocado.");
+      setPendingRevokeShare(null);
     } catch (error) {
       setMessage(formatError(error, "No se pudo revocar el acceso."));
     } finally {
@@ -1657,7 +1661,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                     </select>
                     <button
                       type="button"
-                      onClick={() => void handleRevokeShare(s.id)}
+                      onClick={() => setPendingRevokeShare(s)}
                       disabled={revokingShareId === s.id || isUpdating}
                       className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                     >
@@ -1772,13 +1776,30 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       <ConfirmDialog
         open={confirmDeleteOpen}
         title={`¿Borrar el caso «${caseItem.titulo}»?`}
-        description="Se eliminan también los mensajes con el agente y los adjuntos. No se puede deshacer."
+        description="El caso pasa a la Papelera y se purga automáticamente después de 15 días. Mientras esté en Papelera, un gerente puede restaurarlo."
         confirmLabel="Borrar caso"
         tone="destructive"
         busy={deletingCase}
         onConfirm={handleConfirmDeleteCase}
         onClose={() => {
           if (!deletingCase) setConfirmDeleteOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingRevokeShare !== null}
+        title={
+          pendingRevokeShare
+            ? `¿Revocar el acceso de ${pendingRevokeShare.shared_with_email}?`
+            : ""
+        }
+        description="El usuario perderá el acceso al caso inmediatamente. Puedes volver a compartir después si lo necesitas."
+        confirmLabel="Revocar acceso"
+        tone="destructive"
+        busy={revokingShareId === pendingRevokeShare?.id}
+        onConfirm={handleConfirmRevokeShare}
+        onClose={() => {
+          if (!revokingShareId) setPendingRevokeShare(null);
         }}
       />
     </section>
