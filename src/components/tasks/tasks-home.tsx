@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getClientEnv } from "@/lib/env";
 import { useWorkspace } from "@/lib/workspace/context";
 import { listCustomers, type CustomerRow } from "@/lib/customers/customers-db";
 import {
@@ -80,6 +81,10 @@ export function TasksHome() {
   const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [supabaseDebug, setSupabaseDebug] = useState<{
+    url: string | null;
+    host: string | null;
+  } | null>(null);
 
   const [showNew, setShowNew] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -126,6 +131,27 @@ export function TasksHome() {
         );
         const self = opts.find((m) => m.user_id === appUser.id);
         setAssigneeId(self?.user_id ?? opts[0]?.user_id ?? "");
+
+        // Debug temporal: confirma a qué Supabase apunta el deploy actual.
+        if (typeof window !== "undefined") {
+          const enabled =
+            new URLSearchParams(window.location.search).get("debugSupabase") ===
+            "1";
+          if (enabled) {
+            const { NEXT_PUBLIC_SUPABASE_URL } = getClientEnv();
+            const url = NEXT_PUBLIC_SUPABASE_URL ?? null;
+            let host: string | null = null;
+            try {
+              host = url ? new URL(url).host : null;
+            } catch {
+              host = null;
+            }
+            setSupabaseDebug({ url, host });
+            // Log controlado (solo si debugSupabase=1)
+            // eslint-disable-next-line no-console
+            console.info("[tareas] supabase", { url, host });
+          }
+        }
       } catch (e) {
         if (!cancelled)
           setMessage(
@@ -206,6 +232,25 @@ export function TasksHome() {
             <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
               Tablero de tareas del workspace. Solo gerentes e internos.
             </p>
+            {supabaseDebug ? (
+              <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+                <div className="font-semibold tracking-wide">
+                  DEBUG (debugSupabase=1)
+                </div>
+                <div className="mt-1">
+                  <span className="font-medium">Supabase host:</span>{" "}
+                  <span className="font-mono">
+                    {supabaseDebug.host ?? "—"}
+                  </span>
+                </div>
+                <div className="mt-1">
+                  <span className="font-medium">Supabase url:</span>{" "}
+                  <span className="font-mono">
+                    {supabaseDebug.url ?? "—"}
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <div
