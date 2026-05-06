@@ -44,6 +44,22 @@ const PRIORIDAD_LABEL: Record<TaskPrioridad, string> = {
   urgente: "Urgente",
 };
 
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+}
+
+function taskClienteLabel(t: WorkspaceTaskWithRelations): string {
+  return t.customer?.label?.trim() || "Sin cliente";
+}
+
+function taskMarcaLabel(t: WorkspaceTaskWithRelations): string {
+  const raw = t.case?.marca_preferida;
+  return raw && raw.trim().length > 0 ? raw.trim() : "—";
+}
+
 function displayUser(
   u: { nombre: string; apellido: string | null; email: string } | null | undefined,
 ) {
@@ -386,27 +402,39 @@ export function TasksHome() {
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950/80 dark:text-slate-400">
               <tr>
-                <th className="px-4 py-3">Urgencia</th>
-                <th className="px-4 py-3">Título</th>
+                <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">Marca</th>
+                <th className="px-4 py-3">Tema</th>
+                <th className="px-4 py-3">Responsable</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3">Prioridad</th>
-                <th className="px-4 py-3">Responsable</th>
                 <th className="px-4 py-3">Vence</th>
+                <th className="px-4 py-3">Sig. seguimiento</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {sortedTasks.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                   <td className="px-4 py-3">
-                    <TaskUrgencyBadge venceEl={t.vence_el} estado={t.estado} />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        {taskClienteLabel(t)}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <TaskUrgencyBadge venceEl={t.vence_el} estado={t.estado} />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    {taskMarcaLabel(t)}
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
-                    <Link
-                      href={`/app/tareas/${t.id}`}
-                      className="hover:underline"
-                    >
+                    <Link href={`/app/tareas/${t.id}`} className="hover:underline">
                       {t.title}
                     </Link>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    {displayUser(t.assignee)}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                     {ESTADO_LABEL[t.estado]}
@@ -415,15 +443,10 @@ export function TasksHome() {
                     {PRIORIDAD_LABEL[t.prioridad]}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {displayUser(t.assignee)}
+                    {formatDateTime(t.vence_el)}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {t.vence_el
-                      ? new Date(t.vence_el).toLocaleString("es-MX", {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })
-                      : "—"}
+                    {formatDateTime(t.proximo_seguimiento_at)}
                   </td>
                 </tr>
               ))}

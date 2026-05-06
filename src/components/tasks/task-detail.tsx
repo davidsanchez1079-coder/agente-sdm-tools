@@ -79,6 +79,23 @@ function displayUser(
   return n || u.email;
 }
 
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+}
+
+function taskClienteLabel(t: WorkspaceTaskWithRelations): string {
+  return t.customer?.label?.trim() || "Sin cliente";
+}
+
+function taskMarcaLabel(t: WorkspaceTaskWithRelations): string | null {
+  const raw = t.case?.marca_preferida;
+  const label = raw && raw.trim().length > 0 ? raw.trim() : null;
+  return label;
+}
+
 export function TaskDetail({ taskId }: { taskId: string }) {
   const router = useRouter();
   const { workspaceId, appUser, workspaceRol } = useWorkspace();
@@ -332,13 +349,38 @@ export function TaskDetail({ taskId }: { taskId: string }) {
               <span
                 className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.25em] ${MODULE_CHIP.tareas}`}
               >
-                Tarea
+                {taskClienteLabel(task)}
+              </span>
+              {taskMarcaLabel(task) ? (
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
+                  {taskMarcaLabel(task)}
+                </span>
+              ) : null}
+            </div>
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+              {task.title}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-700 dark:bg-slate-950">
+                Responsable: <span className="font-semibold">{displayUser(task.assignee)}</span>
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-700 dark:bg-slate-950">
+                Estado: <span className="font-semibold">{ESTADO_LABEL[task.estado]}</span>
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-700 dark:bg-slate-950">
+                Prioridad: <span className="font-semibold">{PRIORIDAD_LABEL[task.prioridad]}</span>
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-700 dark:bg-slate-950">
+                Vence: <span className="font-semibold">{formatDateTime(task.vence_el)}</span>
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-700 dark:bg-slate-950">
+                Sig. seguimiento:{" "}
+                <span className="font-semibold">
+                  {formatDateTime(task.proximo_seguimiento_at)}
+                </span>
               </span>
               <TaskUrgencyBadge venceEl={task.vence_el} estado={task.estado} />
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              {task.title}
-            </h1>
           </div>
           <div
             className={`flex h-11 w-11 items-center justify-center rounded-xl ${MODULE_ICON_BG.tareas}`}

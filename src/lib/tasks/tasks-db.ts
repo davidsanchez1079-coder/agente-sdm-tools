@@ -30,7 +30,8 @@ const TASK_WITH_RELATIONS = `
   ${TASK_COLUMNS.trim()},
   assignee:users!workspace_tasks_assigned_to_user_id_fkey(id, nombre, apellido, email),
   creator:users!workspace_tasks_created_by_user_id_fkey(id, nombre, apellido, email),
-  customer:customers(id, label)
+  customer:customers(id, label),
+  case:cases(id, marca_preferida)
 `;
 
 export async function listWorkspaceTasks(

@@ -36,6 +36,7 @@ export type WorkspaceTaskWithRelations = WorkspaceTaskRow & {
   assignee?: TaskUserSnippet | null;
   creator?: TaskUserSnippet | null;
   customer?: { id: string; label: string } | null;
+  case?: { id: string; marca_preferida: string | null } | null;
 };
 
 export type TaskCommentRow = {
