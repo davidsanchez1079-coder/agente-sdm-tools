@@ -188,6 +188,8 @@ export function TasksHome() {
     setMessage(null);
     try {
       const supabase = getSupabaseBrowserClient();
+      const authUserRes = await supabase.auth.getUser();
+      const authUid = authUserRes.data.user?.id ?? null;
       const vence = dueAtFromPreset(duePreset).toISOString();
       const proximo = new Date(proxSeg).toISOString();
       await createWorkspaceTask(supabase, {
@@ -214,7 +216,8 @@ export function TasksHome() {
     } catch (err) {
       const base = formatError(err, "No se pudo crear la tarea.");
       const debug = `workspaceId=${workspaceId} createdBy=${appUser.id} assignedTo=${assigneeId}`;
-      setMessage(`${base}\n${debug}`);
+      const auth = `auth.uid=${authUid ?? "null"}`;
+      setMessage(`${base}\n${debug}\n${auth}`);
     } finally {
       setCreating(false);
     }
