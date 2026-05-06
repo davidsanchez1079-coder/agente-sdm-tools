@@ -23,6 +23,11 @@ const TILES: {
       "Pantalla principal. Carpetas, casos y conversación con el agente.",
   },
   {
+    id: "tareas",
+    description:
+      "Tareas internas del workspace: responsables, vencimientos, comentarios y adjuntos.",
+  },
+  {
     id: "customers",
     description: "Catálogo base de clientes y casos asociados.",
   },

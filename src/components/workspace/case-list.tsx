@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useIsExterno } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import {
   deleteCase,
   listCasesByCustomer,
@@ -46,6 +46,9 @@ export function CaseList({
   refreshToken = 0,
 }: CaseListProps) {
   const isExterno = useIsExterno();
+  const { workspaceRol, appUser } = useWorkspace();
+  const canDeleteCase =
+    workspaceRol === "gerente" || appUser.rol === "admin";
   const [rows, setRows] = useState<CaseRow[]>([]);
   const [pendingDelete, setPendingDelete] = useState<CaseRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -218,7 +221,7 @@ export function CaseList({
                 </p>
               ) : null}
             </Link>
-            {!isExterno ? (
+            {!isExterno && canDeleteCase ? (
             <button
               type="button"
               onClick={() => setPendingDelete(row)}

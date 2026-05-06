@@ -3,6 +3,7 @@ export type ModuleId =
   | "usuario"
   | "customers"
   | "caso"
+  | "tareas"
   | "agentes"
   | "accesos"
   | "brands";
@@ -39,6 +40,12 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     href: "/app/caso",
     kicker: "Caso/Oportunidad",
   },
+  tareas: {
+    id: "tareas",
+    label: "Tareas",
+    href: "/app/tareas",
+    kicker: "Tareas",
+  },
   agentes: {
     id: "agentes",
     label: "Agentes",
@@ -67,6 +74,8 @@ export const MODULE_CHIP: Record<ModuleId, string> = {
   customers:
     "border-cyan-500/40 bg-cyan-50 text-cyan-700 dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200",
   caso: "border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200",
+  tareas:
+    "border-sky-500/40 bg-sky-50 text-sky-800 dark:border-sky-400/40 dark:bg-sky-500/15 dark:text-sky-100",
   agentes:
     "border-teal-500/40 bg-teal-50 text-teal-700 dark:border-teal-400/40 dark:bg-teal-500/15 dark:text-teal-200",
   accesos:
@@ -83,6 +92,8 @@ export const MODULE_ICON_BG: Record<ModuleId, string> = {
   customers:
     "bg-cyan-50 text-cyan-600 ring-1 ring-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-400/30",
   caso: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30",
+  tareas:
+    "bg-sky-50 text-sky-600 ring-1 ring-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-400/30",
   agentes:
     "bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-400/30",
   accesos:
@@ -96,6 +107,7 @@ export const MODULE_BAR: Record<ModuleId, string> = {
   usuario: "before:bg-violet-500 dark:before:bg-violet-400",
   customers: "before:bg-cyan-500 dark:before:bg-cyan-400",
   caso: "before:bg-emerald-500 dark:before:bg-emerald-400",
+  tareas: "before:bg-sky-500 dark:before:bg-sky-400",
   agentes: "before:bg-teal-500 dark:before:bg-teal-400",
   accesos: "before:bg-indigo-500 dark:before:bg-indigo-400",
   brands: "before:bg-amber-500 dark:before:bg-amber-400",
@@ -106,6 +118,7 @@ export const MODULE_HOVER_RING: Record<ModuleId, string> = {
   usuario: "hover:ring-violet-500/40 dark:hover:ring-violet-400/40",
   customers: "hover:ring-cyan-500/40 dark:hover:ring-cyan-400/40",
   caso: "hover:ring-emerald-500/40 dark:hover:ring-emerald-400/40",
+  tareas: "hover:ring-sky-500/40 dark:hover:ring-sky-400/40",
   agentes: "hover:ring-teal-500/40 dark:hover:ring-teal-400/40",
   accesos: "hover:ring-indigo-500/40 dark:hover:ring-indigo-400/40",
   brands: "hover:ring-amber-500/40 dark:hover:ring-amber-400/40",
@@ -119,6 +132,8 @@ export const MODULE_ARROW: Record<ModuleId, string> = {
   customers:
     "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-300 dark:group-hover:text-cyan-200",
   caso: "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300 dark:group-hover:text-emerald-200",
+  tareas:
+    "text-sky-600 group-hover:text-sky-700 dark:text-sky-300 dark:group-hover:text-sky-200",
   agentes:
     "text-teal-600 group-hover:text-teal-700 dark:text-teal-300 dark:group-hover:text-teal-200",
   accesos:
@@ -135,6 +150,8 @@ export const MODULE_ACTIVE_NAV: Record<ModuleId, string> = {
   customers:
     "border-cyan-500/30 bg-cyan-50 text-cyan-800 shadow-[inset_3px_0_0_0_rgb(6_182_212)] dark:border-cyan-400/30 dark:bg-cyan-500/10 dark:text-cyan-100 dark:shadow-[inset_3px_0_0_0_rgb(34_211_238)]",
   caso: "border-emerald-500/30 bg-emerald-50 text-emerald-800 shadow-[inset_3px_0_0_0_rgb(16_185_129)] dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100 dark:shadow-[inset_3px_0_0_0_rgb(52_211_153)]",
+  tareas:
+    "border-sky-500/30 bg-sky-50 text-sky-900 shadow-[inset_3px_0_0_0_rgb(14_165_233)] dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100 dark:shadow-[inset_3px_0_0_0_rgb(56_189_248)]",
   agentes:
     "border-teal-500/30 bg-teal-50 text-teal-800 shadow-[inset_3px_0_0_0_rgb(20_184_166)] dark:border-teal-400/30 dark:bg-teal-500/10 dark:text-teal-100 dark:shadow-[inset_3px_0_0_0_rgb(45_212_191)]",
   accesos:
@@ -148,6 +165,7 @@ export function moduleIdFromPath(pathname: string): ModuleId {
   if (pathname.startsWith("/app/usuario")) return "usuario";
   if (pathname.startsWith("/app/customers")) return "customers";
   if (pathname.startsWith("/app/caso")) return "caso";
+  if (pathname.startsWith("/app/tareas")) return "tareas";
   if (pathname.startsWith("/app/agentes")) return "agentes";
   if (pathname.startsWith("/app/accesos")) return "accesos";
   if (pathname.startsWith("/app/brands")) return "brands";

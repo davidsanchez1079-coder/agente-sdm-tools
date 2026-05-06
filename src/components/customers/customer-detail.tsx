@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useIsExterno } from "@/lib/workspace/context";
+import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import {
   countCasesForCustomerLabel,
   deleteCustomer,

@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { getClientEnv } from "@/lib/env";
+import type { Database } from "@/lib/supabase/database.types";
 
-let browserClient: ReturnType<typeof createClient> | null = null;
+let browserClient: ReturnType<typeof createClient<Database>> | null = null;
 
 export function getSupabaseBrowserClient() {
   if (browserClient) return browserClient;
@@ -12,6 +13,9 @@ export function getSupabaseBrowserClient() {
     throw new Error("Faltan variables públicas de Supabase");
   }
 
-  browserClient = createClient(NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  browserClient = createClient<Database>(
+    NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  );
   return browserClient;
 }

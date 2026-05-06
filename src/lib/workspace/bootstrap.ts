@@ -25,15 +25,32 @@ async function resolveWorkspaceRol(
 ): Promise<WorkspaceRol> {
   if (workspace.user_id === appUserId) return "gerente";
 
-  const { data } = await supabase
+  // Puede haber más de una fila por (workspace_id, user_id) si históricamente
+  // se crearon invitaciones con emails distintos: maybeSingle() fallaría y
+  // terminaríamos en "externo" por defecto. Tomamos el mayor privilegio.
+  const { data, error } = await supabase
     .from("workspace_members")
     .select("rol")
     .eq("workspace_id", workspace.id)
     .eq("user_id", appUserId)
     .eq("activo", true)
-    .maybeSingle<{ rol: WorkspaceRol }>();
+    .returns<{ rol: WorkspaceRol }[]>();
 
-  return data?.rol ?? "externo";
+  if (error) throw error;
+
+  const rank: Record<WorkspaceRol, number> = {
+    gerente: 1,
+    interno: 2,
+    externo: 3,
+  };
+
+  let best: WorkspaceRol | null = null;
+  for (const row of data ?? []) {
+    const rol = row.rol;
+    if (!best || rank[rol] < rank[best]) best = rol;
+  }
+
+  return best ?? "externo";
 }
 
 function deriveNameParts(email: string) {
@@ -79,9 +96,9 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
     appUser = insertedUser;
   }
 
-  // Prefer primary workspace via RPC: owned > membered. Esto cubre a
-  // invitees (que NO tienen workspace propio pero sí membresía en el
-  // del gerente que los invitó) y a workspace owners (que ven el suyo).
+  // Workspace primario vía RPC (ver migración get_primary_workspace_*):
+  // prioriza membresía en workspaces de otros (invitación) antes que el
+  // workspace auto-creado al registrarse, para no quedar en un catálogo vacío.
   const primaryRes = await supabase.rpc("get_primary_workspace_for_user", {
     user_id_input: appUser.id,
   });

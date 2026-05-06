@@ -1,6 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+
+function safeInternalPath(raw: string | null): string | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (!t.startsWith("/") || t.startsWith("//")) return null;
+  return t;
+}
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
@@ -73,7 +80,8 @@ export function AuthShell() {
     }
 
     if (mode === "signin" && response.data.session) {
-      router.replace("/app");
+      const next = safeInternalPath(searchParams.get("next"));
+      router.replace(next ?? "/app");
       return;
     }
 

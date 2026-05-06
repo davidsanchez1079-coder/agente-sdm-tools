@@ -39,7 +39,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       if (sessionError || !sessionData.session) {
         setState({ status: "unauth" });
-        router.replace("/");
+        const returnTo =
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : "/app";
+        router.replace(`/?next=${encodeURIComponent(returnTo)}`);
         return;
       }
 
@@ -68,7 +72,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (cancelled) return;
         console.error("Falló preparación de workspace", error);
         setState({ status: "unauth" });
-        router.replace("/?auth=workspace-error");
+        const returnTo =
+          typeof window !== "undefined"
+            ? `${window.location.pathname}${window.location.search}`
+            : "/app";
+        router.replace(
+          `/?auth=workspace-error&next=${encodeURIComponent(returnTo)}`,
+        );
       }
     })();
 

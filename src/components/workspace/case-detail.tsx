@@ -7,6 +7,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import {
   addShare,
+  canManageSharesInWorkspace,
+  ensureShareLinkToken,
+  getPublicShareLandingUrl,
   listActiveShares,
   listShareableMembers,
   revokeShare,
@@ -127,10 +130,22 @@ function formatMessageTime(iso: string): string {
   }
 }
 
+function isSameWorkspaceMemberAsViewer(
+  m: ShareableMember,
+  viewer: { id: string; email: string },
+): boolean {
+  if (m.user_id != null && m.user_id === viewer.id) return true;
+  return (
+    m.email.trim().toLowerCase() === viewer.email.trim().toLowerCase()
+  );
+}
+
 export function CaseDetail({ caseId }: CaseDetailProps) {
   const router = useRouter();
   const isExterno = useIsExterno();
-  const { appUser, workspaceRol } = useWorkspace();
+  const { appUser, workspaceRol, workspaceId: contextWorkspaceId } = useWorkspace();
+  /** Gerente/admin respecto al workspace de la carpeta del caso (no solo el de la barra). */
+  const [canManageSharesForCase, setCanManageSharesForCase] = useState(false);
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingCase, setDeletingCase] = useState(false);
@@ -140,12 +155,15 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [savingConversion, setSavingConversion] = useState(false);
   const [shares, setShares] = useState<CaseShareRow[]>([]);
   const [shareableMembers, setShareableMembers] = useState<ShareableMember[]>([]);
+  const [caseWorkspaceId, setCaseWorkspaceId] = useState<string | null>(null);
+  const [shareListError, setShareListError] = useState<string | null>(null);
   const [shareDraftMember, setShareDraftMember] = useState<string>("");
   const [shareDraftPermission, setShareDraftPermission] = useState<CaseSharePermission>("edit");
   const [addingShare, setAddingShare] = useState(false);
   const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
   const [updatingShareId, setUpdatingShareId] = useState<string | null>(null);
   const [pendingRevokeShare, setPendingRevokeShare] = useState<CaseShareRow | null>(null);
+  const [copyShareBusyId, setCopyShareBusyId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -198,6 +216,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           setNotFound(true);
           return;
         }
+        setCanManageSharesForCase(false);
         setCaseItem(caseData);
         setResumenDraft(caseData.resumen_ejecutivo ?? "");
         setSiguienteDraft(caseData.siguiente_accion ?? "");
@@ -226,10 +245,26 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           setMessages(msgs);
           setAttachments(atts);
           if (folderRes.data?.workspace_id) {
+            const ws = folderRes.data.workspace_id;
+            if (!cancelled) {
+              setCaseWorkspaceId(ws);
+              setShareListError(null);
+            }
+            try {
+              const canShare = await canManageSharesInWorkspace(
+                supabase,
+                appUser.id,
+                ws,
+                appUser.rol === "admin",
+              );
+              if (!cancelled) setCanManageSharesForCase(canShare);
+            } catch {
+              if (!cancelled) setCanManageSharesForCase(false);
+            }
             try {
               const list = await listAgentes(
                 supabase,
-                folderRes.data.workspace_id,
+                ws,
                 { onlyActive: true },
               );
               if (!cancelled) setAgentes(list);
@@ -239,15 +274,26 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             try {
               const [activeShares, shareables] = await Promise.all([
                 listActiveShares(supabase, caseId),
-                listShareableMembers(supabase, folderRes.data.workspace_id),
+                listShareableMembers(supabase, ws),
               ]);
               if (!cancelled) {
                 setShares(activeShares);
                 setShareableMembers(shareables);
               }
-            } catch {
-              // Silencioso: si falla, no mostramos sharing pero no rompemos el caso.
+            } catch (err) {
+              if (!cancelled) {
+                console.error("listShareableMembers / shares", err);
+                setShareListError(
+                  formatError(
+                    err,
+                    "No se pudo cargar la lista para compartir. En Supabase aplica las migraciones de compartir (p. ej. list_workspace_members_for_share e interno_can_share_cases).",
+                  ),
+                );
+              }
             }
+          } else if (!cancelled) {
+            setCaseWorkspaceId(null);
+            setCanManageSharesForCase(false);
           }
         }
       } catch (error) {
@@ -263,7 +309,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [caseId, appUser.id, appUser.rol]);
 
   useEffect(() => {
     let cancelled = false;
@@ -576,7 +622,34 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     }
   }
 
+  async function handleCopyShareLink(s: CaseShareRow) {
+    if (!canManageSharesForCase) return;
+    setCopyShareBusyId(s.id);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const token =
+        s.link_token ?? (await ensureShareLinkToken(supabase, s.id));
+      if (!s.link_token) {
+        setShares((prev) =>
+          prev.map((row) =>
+            row.id === s.id ? { ...row, link_token: token } : row,
+          ),
+        );
+      }
+      await navigator.clipboard.writeText(getPublicShareLandingUrl(token));
+      setMessage(
+        "Enlace copiado. El interesado debe usar el mismo correo con el que está en el workspace.",
+      );
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo copiar el enlace."));
+    } finally {
+      setCopyShareBusyId(null);
+    }
+  }
+
   async function handleAddShare() {
+    if (!canManageSharesForCase) return;
     if (!caseItem || !shareDraftMember) return;
     const target = shareableMembers.find((m) => m.member_id === shareDraftMember);
     if (!target) return;
@@ -597,8 +670,19 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       });
       setShareDraftMember("");
       setShareDraftPermission("edit");
+      let extra = "";
+      if (newShare.link_token) {
+        try {
+          await navigator.clipboard.writeText(
+            getPublicShareLandingUrl(newShare.link_token),
+          );
+          extra = " Enlace público copiado al portapapeles.";
+        } catch {
+          extra = " Usa «Copiar enlace» junto al invitado para obtener la URL.";
+        }
+      }
       setMessage(
-        `Caso compartido con ${target.display_name} (${shareDraftPermission === "edit" ? "ver y editar" : "solo ver"}).`,
+        `Caso compartido con ${target.display_name} (${shareDraftPermission === "edit" ? "ver y editar" : "solo ver"}).${extra}`,
       );
     } catch (error) {
       setMessage(formatError(error, "No se pudo compartir el caso."));
@@ -611,6 +695,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     shareId: string,
     permission: CaseSharePermission,
   ) {
+    if (!canManageSharesForCase) return;
     setUpdatingShareId(shareId);
     setMessage(null);
     try {
@@ -626,6 +711,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   }
 
   async function handleConfirmRevokeShare() {
+    if (!canManageSharesForCase) return;
     if (!pendingRevokeShare) return;
     const shareId = pendingRevokeShare.id;
     setRevokingShareId(shareId);
@@ -1615,15 +1701,61 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           />
         </div>
       </section>
+      </>
+      ) : null}
 
-      {(workspaceRol === "gerente" || (workspaceRol === "interno" && caseItem.created_by === appUser.id)) ? (
+      {(workspaceRol === "gerente" ||
+        workspaceRol === "interno" ||
+        appUser.rol === "admin") ? (
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
             Colaboradores
           </p>
+          {caseWorkspaceId &&
+          contextWorkspaceId &&
+          caseWorkspaceId !== contextWorkspaceId &&
+          (workspaceRol === "gerente" ||
+            workspaceRol === "interno" ||
+            appUser.rol === "admin") ? (
+            <div className="mt-3 rounded-xl border border-amber-400/50 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-400/40 dark:bg-amber-500/10 dark:text-amber-100">
+              Este caso pertenece a <strong>otro workspace</strong> que el de la
+              barra lateral. La lista de compartir usa solo miembros de{" "}
+              <strong>ese</strong> equipo (p. ej. GOTIA). En{" "}
+              <strong className="font-semibold">Accesos</strong> estás viendo el
+              workspace actual; si ahí hay gente pero aquí no, no coinciden los
+              equipos.
+            </div>
+          ) : null}
+          {shareListError ? (
+            <div className="mt-3 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+              {shareListError}
+            </div>
+          ) : null}
+          {(workspaceRol === "gerente" ||
+            workspaceRol === "interno" ||
+            appUser.rol === "admin") &&
+          !canManageSharesForCase &&
+          caseWorkspaceId ? (
+            <div className="mt-3 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-800 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-200">
+              En la barra lateral tienes acceso a un workspace, pero{" "}
+              <strong>no</strong> eres gerente ni interno en el workspace de la
+              carpeta de este caso. Solo quien tenga ese rol en <strong>ese</strong>{" "}
+              equipo puede invitar colaboradores aquí. Cambia de workspace en la
+              barra o pide la invitación al equipo correcto (p. ej. GOTIA).
+            </div>
+          ) : null}
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Miembros del workspace con acceso explícito a este caso. El permiso (solo ver / ver y editar) se aplica sobre lo que ya permite su rol.
+            Miembros del workspace con acceso explícito a este caso. El permiso
+            (solo ver / ver y editar) se aplica sobre lo que ya permite su rol.
+            {canManageSharesForCase
+              ? null
+              : (
+                  <span className="mt-2 block text-amber-700 dark:text-amber-300">
+                    Solo un gerente o interno de este workspace puede invitar,
+                    cambiar permisos o revocar accesos.
+                  </span>
+                )}
           </p>
         </div>
 
@@ -1645,28 +1777,52 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                     </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <select
-                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                      value={s.permission}
-                      onChange={(event) =>
-                        void handleUpdateSharePermission(
-                          s.id,
-                          event.target.value as CaseSharePermission,
-                        )
-                      }
-                      disabled={isUpdating || revokingShareId === s.id}
-                    >
-                      <option value="view">Solo ver</option>
-                      <option value="edit">Ver y editar</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => setPendingRevokeShare(s)}
-                      disabled={revokingShareId === s.id || isUpdating}
-                      className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                    >
-                      {revokingShareId === s.id ? "Revocando…" : "Revocar"}
-                    </button>
+                    {canManageSharesForCase ? (
+                      <select
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        value={s.permission}
+                        onChange={(event) =>
+                          void handleUpdateSharePermission(
+                            s.id,
+                            event.target.value as CaseSharePermission,
+                          )
+                        }
+                        disabled={isUpdating || revokingShareId === s.id}
+                      >
+                        <option value="view">Solo ver</option>
+                        <option value="edit">Ver y editar</option>
+                      </select>
+                    ) : (
+                      <span className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                        {s.permission === "edit" ? "Ver y editar" : "Solo ver"}
+                      </span>
+                    )}
+                    {canManageSharesForCase ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyShareLink(s)}
+                          disabled={
+                            copyShareBusyId === s.id ||
+                            revokingShareId === s.id ||
+                            isUpdating
+                          }
+                          className="shrink-0 rounded-lg border border-cyan-400/50 px-2.5 py-1 text-xs font-medium text-cyan-800 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-cyan-400/40 dark:text-cyan-200 dark:hover:bg-cyan-500/10"
+                        >
+                          {copyShareBusyId === s.id
+                            ? "Copiando…"
+                            : "Copiar enlace"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingRevokeShare(s)}
+                          disabled={revokingShareId === s.id || isUpdating}
+                          className="shrink-0 rounded-lg border border-rose-300 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                        >
+                          {revokingShareId === s.id ? "Revocando…" : "Revocar"}
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -1678,10 +1834,17 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           </p>
         )}
 
+        {canManageSharesForCase ? (
         <div className="grid gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/40 p-3 dark:border-slate-700 dark:bg-slate-900/30">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
             Compartir con un miembro del workspace
           </span>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            Misma nómina que en Accesos para este workspace: membresía activa,
+            incluidas invitaciones pendientes (aún sin cuenta vinculada). Al
+            compartir se genera un enlace; el acceso al caso queda efectivo cuando
+            acepten la invitación con ese correo.
+          </p>
           <select
             className={controlClass}
             value={shareDraftMember}
@@ -1692,11 +1855,19 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             {shareableMembers
               .filter(
                 (m) =>
+                  !isSameWorkspaceMemberAsViewer(m, appUser) &&
                   !shares.some((s) => s.shared_with_member_id === m.member_id),
               )
               .map((m) => (
                 <option key={m.member_id} value={m.member_id}>
-                  {m.display_name} ({m.rol === "gerente" ? "Gerente" : m.rol === "interno" ? "Interno" : "Externo"}) — {m.email}
+                  {m.display_name} (
+                  {m.rol === "gerente"
+                    ? "Gerente"
+                    : m.rol === "interno"
+                      ? "Interno"
+                      : "Externo"}
+                  ) — {m.email}
+                  {!m.joined_at ? " — invitación pendiente" : ""}
                 </option>
               ))}
           </select>
@@ -1735,13 +1906,19 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           </button>
           {shareableMembers.length === 0 ? (
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              No hay miembros activos en el workspace todavía.
+              No hay miembros activos en este workspace todavía (nadie con invitación
+              aceptada o pendiente). Añade personas desde{" "}
+              <strong className="text-slate-600 dark:text-slate-300">Accesos</strong>{" "}
+              para <strong>el mismo</strong> equipo que este caso. Si en Accesos ves
+              gente y aquí no, revisa el aviso de workspace distinto arriba.
             </span>
           ) : null}
         </div>
+        ) : null}
       </div>
       ) : null}
 
+      {(workspaceRol === "gerente" || appUser.rol === "admin") ? (
       <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 dark:border-rose-500/30 dark:bg-rose-500/5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-rose-700 dark:text-rose-300">
           Eliminar caso
@@ -1759,7 +1936,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           Borrar caso
         </button>
       </div>
-      </>
       ) : null}
 
       {message ? (
