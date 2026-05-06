@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getClientEnv } from "@/lib/env";
-import { useWorkspace } from "@/lib/workspace/context";
+import { useWorkspace, type AppUser } from "@/lib/workspace/context";
 import { listCustomers, type CustomerRow } from "@/lib/customers/customers-db";
 import {
   listMembers,
@@ -58,6 +58,72 @@ type AssigneeOption = {
   label: string;
 };
 
+/** Igual que `auth.uid()` en RLS: claim `sub` del JWT que PostgREST envía. */
+type TareasDebugSnapshot = {
+  supabaseUrl: string | null;
+  supabaseHost: string | null;
+  sessionUserId: string | null;
+  sessionUserEmail: string | null;
+  getUserId: string | null;
+  getUserError: string | null;
+  sessionVsGetUserMismatch: boolean;
+  appUserId: string;
+  appAuthUserId: string;
+  appUserEmail: string;
+  sessionVsAppUserMismatch: boolean;
+  workspaceId: string;
+  workspaceRol: string;
+  capturedAt: string;
+};
+
+function tareasDebugSearchEnabled() {
+  if (typeof window === "undefined") return false;
+  const q = new URLSearchParams(window.location.search);
+  return q.get("debugTareas") === "1" || q.get("debugSupabase") === "1";
+}
+
+async function captureTareasDebugSnapshot(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  ctx: { appUser: AppUser; workspaceId: string; workspaceRol: string },
+): Promise<TareasDebugSnapshot> {
+  const { NEXT_PUBLIC_SUPABASE_URL } = getClientEnv();
+  const url = NEXT_PUBLIC_SUPABASE_URL ?? null;
+  let host: string | null = null;
+  try {
+    host = url ? new URL(url).host : null;
+  } catch {
+    host = null;
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const sessionUid = sessionData.session?.user?.id ?? null;
+  const sessionEmail = sessionData.session?.user?.email ?? null;
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  const getUserId = userData.user?.id ?? null;
+
+  return {
+    supabaseUrl: url,
+    supabaseHost: host,
+    sessionUserId: sessionUid,
+    sessionUserEmail: sessionEmail,
+    getUserId,
+    getUserError: userErr?.message ?? null,
+    sessionVsGetUserMismatch: Boolean(
+      sessionUid && getUserId && sessionUid !== getUserId,
+    ),
+    appUserId: ctx.appUser.id,
+    appAuthUserId: ctx.appUser.authUserId,
+    appUserEmail: ctx.appUser.email,
+    sessionVsAppUserMismatch: Boolean(
+      sessionUid && sessionUid !== ctx.appUser.authUserId,
+    ),
+    workspaceId: ctx.workspaceId,
+    workspaceRol: ctx.workspaceRol,
+    capturedAt: new Date().toISOString(),
+  };
+}
+
 function useAssigneeOptions(
   members: WorkspaceMemberRow[],
 ): AssigneeOption[] {
@@ -81,10 +147,9 @@ export function TasksHome() {
   const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [supabaseDebug, setSupabaseDebug] = useState<{
-    url: string | null;
-    host: string | null;
-  } | null>(null);
+  const [tareasDebug, setTareasDebug] = useState<TareasDebugSnapshot | null>(
+    null,
+  );
 
   const [showNew, setShowNew] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -132,25 +197,15 @@ export function TasksHome() {
         const self = opts.find((m) => m.user_id === appUser.id);
         setAssigneeId(self?.user_id ?? opts[0]?.user_id ?? "");
 
-        // Debug temporal: confirma a qué Supabase apunta el deploy actual.
-        if (typeof window !== "undefined") {
-          const enabled =
-            new URLSearchParams(window.location.search).get("debugSupabase") ===
-            "1";
-          if (enabled) {
-            const { NEXT_PUBLIC_SUPABASE_URL } = getClientEnv();
-            const url = NEXT_PUBLIC_SUPABASE_URL ?? null;
-            let host: string | null = null;
-            try {
-              host = url ? new URL(url).host : null;
-            } catch {
-              host = null;
-            }
-            setSupabaseDebug({ url, host });
-            // Log controlado (solo si debugSupabase=1)
-            // eslint-disable-next-line no-console
-            console.info("[tareas] supabase", { url, host });
-          }
+        if (tareasDebugSearchEnabled()) {
+          const snap = await captureTareasDebugSnapshot(supabase, {
+            appUser,
+            workspaceId,
+            workspaceRol,
+          });
+          setTareasDebug(snap);
+          // eslint-disable-next-line no-console
+          console.info("[tareas] debug snapshot (post-carga)", snap);
         }
       } catch (e) {
         if (!cancelled)
@@ -164,7 +219,7 @@ export function TasksHome() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, workspaceRol, appUser.id]);
+  }, [workspaceId, workspaceRol, appUser.id, appUser.authUserId]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -180,6 +235,16 @@ export function TasksHome() {
     setMessage(null);
     try {
       const supabase = getSupabaseBrowserClient();
+      if (tareasDebugSearchEnabled()) {
+        const preInsert = await captureTareasDebugSnapshot(supabase, {
+          appUser,
+          workspaceId,
+          workspaceRol,
+        });
+        setTareasDebug(preInsert);
+        // eslint-disable-next-line no-console
+        console.info("[tareas] debug snapshot (antes de insert)", preInsert);
+      }
       const vence = dueAtFromPreset(duePreset).toISOString();
       const proximo = new Date(proxSeg).toISOString();
       await createWorkspaceTask(supabase, {
@@ -232,22 +297,71 @@ export function TasksHome() {
             <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
               Tablero de tareas del workspace. Solo gerentes e internos.
             </p>
-            {supabaseDebug ? (
+            {tareasDebug ? (
               <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
                 <div className="font-semibold tracking-wide">
-                  DEBUG (debugSupabase=1)
+                  DEBUG (debugTareas=1 o debugSupabase=1)
                 </div>
-                <div className="mt-1">
+                <div className="mt-1 break-all">
                   <span className="font-medium">Supabase host:</span>{" "}
-                  <span className="font-mono">
-                    {supabaseDebug.host ?? "—"}
-                  </span>
+                  <span className="font-mono">{tareasDebug.supabaseHost ?? "—"}</span>
                 </div>
-                <div className="mt-1">
+                <div className="mt-1 break-all">
                   <span className="font-medium">Supabase url:</span>{" "}
-                  <span className="font-mono">
-                    {supabaseDebug.url ?? "—"}
-                  </span>
+                  <span className="font-mono">{tareasDebug.supabaseUrl ?? "—"}</span>
+                </div>
+                <div className="mt-1 break-all">
+                  <span className="font-medium">session.user.email:</span>{" "}
+                  <span className="font-mono">{tareasDebug.sessionUserEmail ?? "—"}</span>
+                </div>
+                <div className="mt-1 break-all">
+                  <span className="font-medium">session.user.id (= auth.uid en RLS):</span>{" "}
+                  <span className="font-mono">{tareasDebug.sessionUserId ?? "—"}</span>
+                </div>
+                <div className="mt-1 break-all">
+                  <span className="font-medium">auth.getUser().id:</span>{" "}
+                  <span className="font-mono">{tareasDebug.getUserId ?? "—"}</span>
+                  {tareasDebug.getUserError ? (
+                    <span className="ml-1 text-rose-700 dark:text-rose-300">
+                      ({tareasDebug.getUserError})
+                    </span>
+                  ) : null}
+                </div>
+                {tareasDebug.sessionVsGetUserMismatch ? (
+                  <div className="mt-1 font-semibold text-rose-800 dark:text-rose-200">
+                    ⚠ getSession y getUser difieren (sesión posiblemente cruzada o
+                    desactualizada).
+                  </div>
+                ) : null}
+                <div className="mt-1 break-all">
+                  <span className="font-medium">appUser.id (public.users):</span>{" "}
+                  <span className="font-mono">{tareasDebug.appUserId}</span>
+                </div>
+                <div className="mt-1 break-all">
+                  <span className="font-medium">appUser.authUserId:</span>{" "}
+                  <span className="font-mono">{tareasDebug.appAuthUserId}</span>
+                </div>
+                <div className="mt-1 break-all">
+                  <span className="font-medium">appUser.email:</span>{" "}
+                  <span className="font-mono">{tareasDebug.appUserEmail}</span>
+                </div>
+                {tareasDebug.sessionVsAppUserMismatch ? (
+                  <div className="mt-1 font-semibold text-rose-800 dark:text-rose-200">
+                    ⚠ session.user.id ≠ appUser.authUserId: la fila `public.users`
+                    no coincide con el JWT (causa típica de 42501).
+                  </div>
+                ) : null}
+                <div className="mt-1 break-all">
+                  <span className="font-medium">workspaceId:</span>{" "}
+                  <span className="font-mono">{tareasDebug.workspaceId}</span>
+                </div>
+                <div className="mt-1 break-all">
+                  <span className="font-medium">workspaceRol (UI):</span>{" "}
+                  <span className="font-mono">{tareasDebug.workspaceRol}</span>
+                </div>
+                <div className="mt-1 break-all text-slate-600 dark:text-slate-400">
+                  <span className="font-medium">capturedAt:</span>{" "}
+                  <span className="font-mono">{tareasDebug.capturedAt}</span>
                 </div>
               </div>
             ) : null}

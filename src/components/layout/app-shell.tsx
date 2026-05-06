@@ -59,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           value: {
             appUser: {
               id: appUser.id,
+              authUserId: appUser.auth_user_id,
               nombre: appUser.nombre,
               apellido: appUser.apellido,
               email: appUser.email,
