@@ -18,6 +18,85 @@ type WorkspaceRow = {
   user_id: string;
 };
 
+const ROL_RANK: Record<WorkspaceRol, number> = {
+  gerente: 1,
+  interno: 2,
+  externo: 3,
+};
+
+function pickBetterRol(a: WorkspaceRol, b: WorkspaceRol): WorkspaceRol {
+  return ROL_RANK[a] <= ROL_RANK[b] ? a : b;
+}
+
+/**
+ * Elige workspace activo desde membresía real (misma base que RLS:
+ * workspace_members activo + user_id no nulo). Prioriza workspaces donde el
+ * usuario NO es dueño (equivalente a “invitado” en el RPC), y luego el rol más
+ * alto (gerente > interno > externo).
+ */
+async function pickPrimaryWorkspaceFromMembers(
+  supabase: SupabaseClient,
+  appUserId: string,
+): Promise<{ workspace: WorkspaceRow; workspaceRol: WorkspaceRol } | null> {
+  const { data: members, error: memError } = await supabase
+    .from("workspace_members")
+    .select("workspace_id, rol")
+    .eq("user_id", appUserId)
+    .eq("activo", true)
+    .not("user_id", "is", null)
+    .returns<{ workspace_id: string; rol: WorkspaceRol }[]>();
+
+  if (memError) throw memError;
+  if (!members?.length) return null;
+
+  const bestRolByWs = new Map<string, WorkspaceRol>();
+  for (const m of members) {
+    const prev = bestRolByWs.get(m.workspace_id);
+    bestRolByWs.set(
+      m.workspace_id,
+      prev ? pickBetterRol(prev, m.rol) : m.rol,
+    );
+  }
+
+  const workspaceIds = [...bestRolByWs.keys()];
+  const { data: workspaces, error: wsError } = await supabase
+    .from("workspaces")
+    .select("id, user_id")
+    .in("id", workspaceIds)
+    .returns<WorkspaceRow[]>();
+
+  if (wsError) throw wsError;
+
+  const wsById = new Map((workspaces ?? []).map((w) => [w.id, w]));
+
+  type Cand = { workspace: WorkspaceRow; workspaceRol: WorkspaceRol };
+  const candidates: Cand[] = [];
+  for (const [wsId, rol] of bestRolByWs) {
+    const w = wsById.get(wsId);
+    if (!w) continue;
+    const workspaceRol =
+      w.user_id === appUserId ? ("gerente" as const) : rol;
+    candidates.push({ workspace: w, workspaceRol });
+  }
+  if (!candidates.length) return null;
+
+  const invited = candidates.filter((c) => c.workspace.user_id !== appUserId);
+  const pool = invited.length ? invited : candidates;
+
+  let best: Cand | null = null;
+  for (const c of pool) {
+    if (!best) {
+      best = c;
+      continue;
+    }
+    const rdiff = ROL_RANK[c.workspaceRol] - ROL_RANK[best.workspaceRol];
+    if (rdiff < 0) best = c;
+    else if (rdiff === 0 && c.workspace.id < best.workspace.id) best = c;
+  }
+
+  return best;
+}
+
 async function resolveWorkspaceRol(
   supabase: SupabaseClient,
   appUserId: string,
@@ -38,16 +117,10 @@ async function resolveWorkspaceRol(
 
   if (error) throw error;
 
-  const rank: Record<WorkspaceRol, number> = {
-    gerente: 1,
-    interno: 2,
-    externo: 3,
-  };
-
   let best: WorkspaceRol | null = null;
   for (const row of data ?? []) {
     const rol = row.rol;
-    if (!best || rank[rol] < rank[best]) best = rol;
+    if (!best || ROL_RANK[rol] < ROL_RANK[best]) best = rol;
   }
 
   return best ?? "externo";
@@ -96,9 +169,15 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
     appUser = insertedUser;
   }
 
-  // Workspace primario vía RPC (ver migración get_primary_workspace_*):
-  // prioriza membresía en workspaces de otros (invitación) antes que el
-  // workspace auto-creado al registrarse, para no quedar en un catálogo vacío.
+  // 1) Membresía real primero: alinea con RLS (user_has_workspace_role) y evita
+  //    quedar en el workspace “vacío” propio cuando ya hay fila en
+  //    workspace_members (p. ej. RPC exige joined_at y RLS no).
+  const fromMembers = await pickPrimaryWorkspaceFromMembers(supabase, appUser.id);
+  if (fromMembers) {
+    return { appUser, workspace: fromMembers.workspace, workspaceRol: fromMembers.workspaceRol };
+  }
+
+  // 2) RPC histórica: dueño sin fila en members, o entornos sin membresías.
   const primaryRes = await supabase.rpc("get_primary_workspace_for_user", {
     user_id_input: appUser.id,
   });
@@ -111,10 +190,7 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
     }
   }
 
-  // Fallback: comportamiento original. Si por alguna razón la RPC no
-  // existe todavía (migración aún no aplicada) o falla, intentamos
-  // resolver el workspace propio directamente. Y si no existe, lo
-  // creamos.
+  // 3) Fallback: workspace propio por ownership. Si no existe, lo creamos.
   const { data: existingWorkspace, error: workspaceError } = await supabase
     .from("workspaces")
     .select("id, user_id")
