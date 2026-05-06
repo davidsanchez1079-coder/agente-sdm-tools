@@ -5,6 +5,8 @@ import type { WorkspaceRol } from "@/lib/workspace/bootstrap";
 
 export type AppUser = {
   id: string;
+  /** Mismo valor que `auth.users.id` cuando la fila está bien enlazada. */
+  authUserId: string;
   nombre: string;
   apellido: string | null;
   email: string;

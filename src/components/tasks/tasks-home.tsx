@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useWorkspace } from "@/lib/workspace/context";
+import { getClientEnv } from "@/lib/env";
+import { useWorkspace, type AppUser } from "@/lib/workspace/context";
 import { listCustomers, type CustomerRow } from "@/lib/customers/customers-db";
 import {
   listMembers,
@@ -94,14 +95,149 @@ function useAssigneeOptions(
   }, [members]);
 }
 
+type TareasDebugSnapshot = {
+  supabaseUrl: string | null;
+  supabaseHost: string | null;
+  sessionUserId: string | null;
+  sessionUserEmail: string | null;
+  getUserId: string | null;
+  getUserError: string | null;
+  sessionVsGetUserMismatch: boolean;
+  appUserId: string;
+  appAuthUserId: string;
+  appUserEmail: string;
+  sessionVsAppUserMismatch: boolean;
+  workspaceId: string;
+  workspaceRol: string;
+  capturedAt: string;
+};
+
+async function captureTareasDebugSnapshot(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  ctx: { appUser: AppUser; workspaceId: string; workspaceRol: string },
+): Promise<TareasDebugSnapshot> {
+  const { NEXT_PUBLIC_SUPABASE_URL } = getClientEnv();
+  const url = NEXT_PUBLIC_SUPABASE_URL ?? null;
+  let host: string | null = null;
+  try {
+    host = url ? new URL(url).host : null;
+  } catch {
+    host = null;
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const sessionUid = sessionData.session?.user?.id ?? null;
+  const sessionEmail = sessionData.session?.user?.email ?? null;
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  const getUserId = userData.user?.id ?? null;
+
+  return {
+    supabaseUrl: url,
+    supabaseHost: host,
+    sessionUserId: sessionUid,
+    sessionUserEmail: sessionEmail,
+    getUserId,
+    getUserError: userErr?.message ?? null,
+    sessionVsGetUserMismatch: Boolean(
+      sessionUid && getUserId && sessionUid !== getUserId,
+    ),
+    appUserId: ctx.appUser.id,
+    appAuthUserId: ctx.appUser.authUserId,
+    appUserEmail: ctx.appUser.email,
+    sessionVsAppUserMismatch: Boolean(
+      sessionUid && sessionUid !== ctx.appUser.authUserId,
+    ),
+    workspaceId: ctx.workspaceId,
+    workspaceRol: ctx.workspaceRol,
+    capturedAt: new Date().toISOString(),
+  };
+}
+
+function TareasDebugFixedPanel({
+  snapshot,
+  fallbackWorkspaceId,
+  fallbackWorkspaceRol,
+  fallbackAppUser,
+}: {
+  snapshot: TareasDebugSnapshot | null;
+  fallbackWorkspaceId: string;
+  fallbackWorkspaceRol: string;
+  fallbackAppUser: AppUser;
+}) {
+  const supabaseHost = snapshot?.supabaseHost ?? "—";
+  const supabaseUrl = snapshot?.supabaseUrl ?? "—";
+  const sessionUserId = snapshot?.sessionUserId ?? "—";
+  const authGetUserId = snapshot?.getUserId ?? "—";
+  const appUserId = snapshot?.appUserId ?? fallbackAppUser.id;
+  const appUserAuthUserId = snapshot?.appAuthUserId ?? fallbackAppUser.authUserId;
+  const sessionEmail = snapshot?.sessionUserEmail ?? "—";
+  const appEmail = snapshot?.appUserEmail ?? fallbackAppUser.email;
+  const email =
+    snapshot == null
+      ? `(appUser mientras carga) ${appEmail}`
+      : `${sessionEmail} | ${appEmail}`;
+  const workspaceId = snapshot?.workspaceId ?? fallbackWorkspaceId;
+  const workspaceRol = snapshot?.workspaceRol ?? fallbackWorkspaceRol;
+  const mismatchSessionVsGetUser = snapshot
+    ? String(snapshot.sessionVsGetUserMismatch)
+    : "—";
+  const mismatchSessionVsAppUser = snapshot
+    ? String(snapshot.sessionVsAppUserMismatch)
+    : "—";
+
+  const line = (label: string, value: string) => (
+    <div className="break-all font-mono leading-snug">
+      <span className="font-sans font-bold text-black">{label}: </span>
+      <span className="text-neutral-900">{value}</span>
+    </div>
+  );
+
+  return (
+    <div
+      className="fixed inset-x-0 top-0 z-[9999] max-h-[min(50vh,360px)] overflow-y-auto border-b-4 border-black bg-yellow-300 px-3 py-2 text-[13px] text-black shadow-lg"
+      role="region"
+      aria-label="Depuración temporal tareas"
+    >
+      <div className="mb-2 border-b-2 border-black pb-1 font-sans text-sm font-black uppercase tracking-wide">
+        DEBUG TAREAS (temporal) — ?debugTareas=1
+      </div>
+      <div className="grid gap-1">
+        {line("supabaseHost", supabaseHost)}
+        {line("supabaseUrl", supabaseUrl)}
+        {line("sessionUserId", sessionUserId)}
+        {line("authGetUserId", authGetUserId)}
+        {line("appUserId", appUserId)}
+        {line("appUserAuthUserId", appUserAuthUserId)}
+        {line("email", email)}
+        {line("workspaceId", workspaceId)}
+        {line("workspaceRol", workspaceRol)}
+        {line("mismatchSessionVsGetUser", mismatchSessionVsGetUser)}
+        {line("mismatchSessionVsAppUser", mismatchSessionVsAppUser)}
+        {snapshot?.getUserError
+          ? line("getUserError", snapshot.getUserError)
+          : null}
+        {snapshot
+          ? line("capturedAt", snapshot.capturedAt)
+          : line("capturedAt", "pendiente")}
+      </div>
+    </div>
+  );
+}
+
 export function TasksHome() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const showTareasDebugPanel = searchParams.get("debugTareas") === "1";
   const { workspaceId, appUser, workspaceRol } = useWorkspace();
   const [tasks, setTasks] = useState<WorkspaceTaskWithRelations[]>([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [tareasDebug, setTareasDebug] = useState<TareasDebugSnapshot | null>(
+    null,
+  );
 
   const [showNew, setShowNew] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -148,6 +284,17 @@ export function TasksHome() {
         );
         const self = opts.find((m) => m.user_id === appUser.id);
         setAssigneeId(self?.user_id ?? opts[0]?.user_id ?? "");
+
+        if (showTareasDebugPanel) {
+          const snap = await captureTareasDebugSnapshot(supabase, {
+            appUser,
+            workspaceId,
+            workspaceRol,
+          });
+          setTareasDebug(snap);
+          // eslint-disable-next-line no-console
+          console.info("[tareas] debug snapshot (post-carga)", snap);
+        }
       } catch (e) {
         if (!cancelled)
           setMessage(
@@ -160,7 +307,13 @@ export function TasksHome() {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, workspaceRol, appUser.id]);
+  }, [
+    workspaceId,
+    workspaceRol,
+    appUser.id,
+    appUser.authUserId,
+    showTareasDebugPanel,
+  ]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -189,6 +342,16 @@ export function TasksHome() {
     let authUid: string | null = null;
     try {
       const supabase = getSupabaseBrowserClient();
+      if (showTareasDebugPanel) {
+        const preInsert = await captureTareasDebugSnapshot(supabase, {
+          appUser,
+          workspaceId,
+          workspaceRol,
+        });
+        setTareasDebug(preInsert);
+        // eslint-disable-next-line no-console
+        console.info("[tareas] debug snapshot (antes de insert)", preInsert);
+      }
       const authUserRes = await supabase.auth.getUser();
       authUid = authUserRes.data.user?.id ?? null;
       const vence = dueAtFromPreset(duePreset).toISOString();
@@ -229,7 +392,18 @@ export function TasksHome() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
+    <>
+      {showTareasDebugPanel ? (
+        <TareasDebugFixedPanel
+          snapshot={tareasDebug}
+          fallbackWorkspaceId={workspaceId}
+          fallbackWorkspaceRol={workspaceRol}
+          fallbackAppUser={appUser}
+        />
+      ) : null}
+      <main
+        className={`mx-auto max-w-6xl px-4 py-6 ${showTareasDebugPanel ? "pt-[min(50vh,360px)] sm:pt-52" : ""}`}
+      >
       <header
         className={`relative mb-6 space-y-2 pl-4 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-full ${MODULE_BAR.tareas}`}
       >
@@ -479,5 +653,6 @@ export function TasksHome() {
         )}
       </div>
     </main>
+    </>
   );
 }
