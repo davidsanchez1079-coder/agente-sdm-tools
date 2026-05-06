@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/lib/*": ["./src/lib/*", "./panelsdm/lib/*"],
+      "@/components/*": ["./src/components/*", "./panelsdm/components/*"],
+      "@/app/*": ["./src/app/*", "./panelsdm/app/*"]
     }
   },
   "include": [

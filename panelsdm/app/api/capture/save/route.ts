@@ -1,10 +1,10 @@
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 
-import { analyzeCaptureSave } from '@/lib/captureSaveAnalysis';
-import { formatErrorMessage } from '@/lib/formatErrorMessage';
-import { persistDatosRow } from '@/lib/persistCapture';
-import type { DatosRow } from '@/lib/types';
+import { analyzeCaptureSave } from '../../../../lib/captureSaveAnalysis';
+import { formatErrorMessage } from '../../../../lib/formatErrorMessage';
+import { persistDatosRow } from '../../../../lib/persistCapture';
+import type { DatosRow } from '../../../../lib/types';
 
 /** Código HTTP más fiel al tipo de fallo (logs y monitorización). */
 function httpStatusForPersistError(message: string): number {
