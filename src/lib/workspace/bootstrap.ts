@@ -111,6 +111,44 @@ export async function ensureWorkspaceForUser(supabase: SupabaseClient, authUser:
     }
   }
 
+  // Fallback 1 (sin RPC): prioriza un workspace donde el usuario sea member activo.
+  // Esto evita caer en el workspace "propio vacío" cuando sí existe un workspace
+  // compartido por invitación (caso típico de internos).
+  type MemberWorkspaceRow = {
+    workspace_id: string;
+    rol: WorkspaceRol;
+    workspaces: { id: string; user_id: string } | null;
+  };
+
+  const memRes = await supabase
+    .from("workspace_members")
+    .select("workspace_id, rol, workspaces(id, user_id)")
+    .eq("user_id", appUser.id)
+    .eq("activo", true)
+    .returns<MemberWorkspaceRow[]>();
+
+  if (!memRes.error && Array.isArray(memRes.data) && memRes.data.length > 0) {
+    const rank: Record<WorkspaceRol, number> = {
+      gerente: 1,
+      interno: 2,
+      externo: 3,
+    };
+
+    const best = [...memRes.data]
+      .filter((r) => r.workspaces && r.workspaces.id)
+      .sort((a, b) => rank[a.rol] - rank[b.rol])[0];
+
+    if (best?.workspaces) {
+      const workspace: WorkspaceRow = {
+        id: best.workspaces.id,
+        user_id: best.workspaces.user_id,
+      };
+      // Aun así resolvemos rol final por consistencia (maneja dueño/admin).
+      const workspaceRol = await resolveWorkspaceRol(supabase, appUser.id, workspace);
+      return { appUser, workspace, workspaceRol };
+    }
+  }
+
   // Fallback: comportamiento original. Si por alguna razón la RPC no
   // existe todavía (migración aún no aplicada) o falla, intentamos
   // resolver el workspace propio directamente. Y si no existe, lo
