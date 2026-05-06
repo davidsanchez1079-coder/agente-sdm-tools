@@ -60,6 +60,12 @@ function taskMarcaLabel(t: WorkspaceTaskWithRelations): string {
   return raw && raw.trim().length > 0 ? raw.trim() : "—";
 }
 
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
+}
+
 function displayUser(
   u: { nombre: string; apellido: string | null; email: string } | null | undefined,
 ) {
@@ -166,6 +172,18 @@ export function TasksHome() {
       setMessage("Selecciona un responsable.");
       return;
     }
+    if (!workspaceId || !looksLikeUuid(workspaceId)) {
+      setMessage(
+        `Workspace inválido en UI. workspaceId="${workspaceId || ""}". Recarga /app para re-resolver tu workspace.`,
+      );
+      return;
+    }
+    if (!appUser?.id || !looksLikeUuid(appUser.id)) {
+      setMessage(
+        `Usuario inválido en UI. appUser.id="${appUser?.id || ""}". Cierra sesión y vuelve a entrar.`,
+      );
+      return;
+    }
     setCreating(true);
     setMessage(null);
     try {
@@ -194,7 +212,9 @@ export function TasksHome() {
       setDuePreset("1d");
       setProxSeg(new Date().toISOString().slice(0, 16));
     } catch (err) {
-      setMessage(formatError(err, "No se pudo crear la tarea."));
+      const base = formatError(err, "No se pudo crear la tarea.");
+      const debug = `workspaceId=${workspaceId} createdBy=${appUser.id} assignedTo=${assigneeId}`;
+      setMessage(`${base}\n${debug}`);
     } finally {
       setCreating(false);
     }
