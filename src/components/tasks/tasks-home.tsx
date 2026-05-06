@@ -186,10 +186,11 @@ export function TasksHome() {
     }
     setCreating(true);
     setMessage(null);
+    let authUid: string | null = null;
     try {
       const supabase = getSupabaseBrowserClient();
       const authUserRes = await supabase.auth.getUser();
-      const authUid = authUserRes.data.user?.id ?? null;
+      authUid = authUserRes.data.user?.id ?? null;
       const vence = dueAtFromPreset(duePreset).toISOString();
       const proximo = new Date(proxSeg).toISOString();
       await createWorkspaceTask(supabase, {
