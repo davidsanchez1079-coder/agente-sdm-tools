@@ -1,0 +1,112 @@
+import Link from 'next/link';
+import { parse } from 'date-fns';
+import fs from 'fs/promises';
+import path from 'path';
+
+import { buildDailyKpisSeries } from '@/lib/buildDailyKpisSeries';
+import { getExecutiveUiBuildStamp } from '@/lib/buildStamp';
+import { buildFlujoDailyComparativoBundle } from '@/lib/dailyFlujoComparativo';
+import { formatCierreLabel } from '@/lib/dateDisplay';
+import type { ExecutiveData } from '@/lib/executive';
+import { getExecutiveViewModel } from '@/lib/executive';
+import { resolveExecutiveAsOfDay } from '@/lib/executiveAsOf';
+import { loadExecutive } from '@/lib/loadExecutive';
+import { rebuildExecutiveFromDatosRows } from '@/lib/rebuildExecutiveFromDatos';
+import { loadPanelV1 } from '@/lib/panelV1';
+import type { DatosRow } from '@/lib/types';
+import { ExecutiveClient } from './ui/ExecutiveClient';
+import { ExecutiveAssistant } from './ui/ExecutiveAssistant';
+
+async function loadMontoNetoMensualJson(fileName: string): Promise<Record<string, number> | null> {
+  try {
+    const filePath = path.join(process.cwd(), 'data', fileName);
+    const raw = await fs.readFile(filePath, 'utf8');
+    const j = JSON.parse(raw) as { byMonth?: Record<string, number> };
+    return j.byMonth && typeof j.byMonth === 'object' ? j.byMonth : null;
+  } catch {
+    return null;
+  }
+}
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export default async function ExecutivePage() {
+  const [data, v1, amadeusMontoNetoPorMes, sadamaMontoNetoPorMes] = await Promise.all([
+    loadExecutive(),
+    loadPanelV1(),
+    loadMontoNetoMensualJson('amadeus_monto_neto_mensual.json'),
+    loadMontoNetoMensualJson('sadama_monto_neto_mensual.json'),
+  ]);
+  const asOfDay = resolveExecutiveAsOfDay(v1.datos.rows);
+  const asOf = parse(asOfDay, 'yyyy-MM-dd', new Date());
+
+  const rowsThroughAsOf = (v1.datos.rows as DatosRow[]).filter(
+    (r) => typeof r.fecha === 'string' && r.fecha <= asOfDay,
+  );
+
+  let dataForView: ExecutiveData = data;
+  try {
+    if (rowsThroughAsOf.length > 0) {
+      const rebuilt = rebuildExecutiveFromDatosRows(rowsThroughAsOf);
+      dataForView = {
+        ...data,
+        monthly: rebuilt.monthly,
+        yoy_months: rebuilt.yoy_months,
+        executive: rebuilt.executive,
+      };
+    }
+  } catch {
+    /* Sin meses agregables o datos incompletos: se usa el JSON ejecutivo en disco. */
+  }
+
+  const view = getExecutiveViewModel(dataForView, asOf);
+  const dailyFlujo = buildFlujoDailyComparativoBundle(v1.datos.rows, asOf);
+  const dailyKpisSeries = buildDailyKpisSeries(v1.datos.rows, asOfDay);
+  const buildStamp = getExecutiveUiBuildStamp();
+  const cierre = view.lastMonth.fecha_cierre;
+  const cierreLabel = formatCierreLabel(cierre, view.lastMonth.yyyymm);
+
+  return (
+    <main className="min-h-dvh">
+      <div className="border-b border-zinc-200/90 bg-background dark:border-white/[0.07] dark:bg-zinc-950/70 dark:backdrop-blur-md dark:supports-[backdrop-filter]:bg-zinc-950/50">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div className="min-w-0">
+            <div className="truncate bg-gradient-to-r from-zinc-900 to-zinc-700 bg-clip-text text-sm font-semibold text-transparent dark:from-sky-200 dark:via-white dark:to-sky-300">
+              Dashboard Ejecutivo
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-zinc-500 dark:text-sky-200/70">
+              <span className="min-w-0">Cierre: {cierreLabel}</span>
+              <span
+                className="shrink-0 font-mono text-[10px] text-zinc-400 dark:text-zinc-500"
+                title="Commit del build (Vercel) o hash local (npm run dev). Si no coincide con el repo que edita, está sirviendo otra carpeta o caché."
+              >
+                · build {buildStamp}
+              </span>
+            </div>
+          </div>
+          <Link
+            href="/captura"
+            className="shrink-0 rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+          >
+            Captura diaria
+          </Link>
+        </div>
+      </div>
+
+      <ExecutiveClient
+        meta={data.meta}
+        view={view}
+        dailyFlujo={dailyFlujo}
+        dailyKpisSeries={dailyKpisSeries}
+        asOfDay={asOfDay}
+        uiBuildStamp={buildStamp}
+        amadeusMontoNetoPorMes={amadeusMontoNetoPorMes ?? undefined}
+        sadamaMontoNetoPorMes={sadamaMontoNetoPorMes ?? undefined}
+      />
+
+      <ExecutiveAssistant />
+    </main>
+  );
+}
+
