@@ -23,7 +23,12 @@ import {
   type WorkspaceTaskPrioridad,
   type WorkspaceTaskRow,
 } from "@/lib/workspace-tasks/workspace-tasks-db";
-import { createWorkspaceTaskNote } from "@/lib/workspace-tasks/workspace-task-notes-db";
+import {
+  MAX_WORKSPACE_TASK_ATTACHMENT_BYTES,
+  WORKSPACE_TASK_ATTACHMENT_BUCKET,
+  createWorkspaceTaskNote,
+  uploadWorkspaceTaskAttachment,
+} from "@/lib/workspace-tasks/workspace-task-notes-db";
 import { addWorkspaceTaskCopy } from "@/lib/workspace-tasks/workspace-task-copies-db";
 import {
   MODULE_BAR,
@@ -68,6 +73,10 @@ export default function TareasListadoPage() {
   const [altaPrimerMensaje, setAltaPrimerMensaje] = useState("");
   const [altaCopyToUserId, setAltaCopyToUserId] = useState("");
   const [altaCopies, setAltaCopies] = useState<string[]>([]);
+  const [altaUploadingAttachment, setAltaUploadingAttachment] = useState(false);
+  const [altaAttachments, setAltaAttachments] = useState<
+    { id: string; file: File; kind: "foto" | "archivo" }[]
+  >([]);
   const [creating, setCreating] = useState(false);
 
   function toDatetimeLocalValue(iso: string | null): string {
@@ -88,6 +97,14 @@ export default function TareasListadoPage() {
 
   function addMsToNow(ms: number): string {
     return toDatetimeLocalValue(new Date(Date.now() + ms).toISOString());
+  }
+
+  function formatBytes(bytes: number) {
+    if (!Number.isFinite(bytes)) return "";
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1) return `${mb.toFixed(1)} MB`;
+    const kb = bytes / 1024;
+    return `${Math.round(kb)} KB`;
   }
 
   useEffect(() => {
@@ -185,14 +202,50 @@ export default function TareasListadoPage() {
         );
       }
 
-      // Primer mensaje (opcional): crea primera nota en el hilo.
-      if (altaPrimerMensaje.trim()) {
-        await createWorkspaceTaskNote(
-          supabase,
-          workspaceId,
-          created.id,
-          altaPrimerMensaje.trim(),
-        );
+      // Primer mensaje + adjuntos (opcional): crea notas iniciales en el hilo.
+      const initialText = altaPrimerMensaje.trim();
+      if (initialText || altaAttachments.length > 0) {
+        // Si hay adjuntos, los subimos (storage requiere taskId).
+        if (altaAttachments.length > 0) {
+          const uploaded = await Promise.all(
+            altaAttachments.map(async (a) => {
+              const up = await uploadWorkspaceTaskAttachment(
+                supabase,
+                workspaceId,
+                created.id,
+                a.file,
+              );
+              return { ...a, uploaded: up } as const;
+            }),
+          );
+
+          // Primera nota: usa el texto si existe; si no, texto auto.
+          const first = uploaded[0];
+          await createWorkspaceTaskNote(supabase, workspaceId, created.id, initialText || `Adjunto: ${first.uploaded.filename}`, {
+            attachment_storage_path: first.uploaded.storagePath,
+            attachment_filename: first.uploaded.filename,
+            attachment_mime_type: first.uploaded.mimeType,
+            attachment_size_bytes: first.uploaded.sizeBytes,
+          });
+
+          // Resto de adjuntos: cada uno como nota separada.
+          for (const a of uploaded.slice(1)) {
+            await createWorkspaceTaskNote(
+              supabase,
+              workspaceId,
+              created.id,
+              `Adjunto: ${a.uploaded.filename}`,
+              {
+                attachment_storage_path: a.uploaded.storagePath,
+                attachment_filename: a.uploaded.filename,
+                attachment_mime_type: a.uploaded.mimeType,
+                attachment_size_bytes: a.uploaded.sizeBytes,
+              },
+            );
+          }
+        } else if (initialText) {
+          await createWorkspaceTaskNote(supabase, workspaceId, created.id, initialText);
+        }
       }
 
       setTasks((prev) => [created, ...prev]);
@@ -208,6 +261,7 @@ export default function TareasListadoPage() {
       setAltaPrimerMensaje("");
       setAltaCopyToUserId("");
       setAltaCopies([]);
+      setAltaAttachments([]);
       setShowAlta(false);
       setMessage("Tarea creada.");
     } catch (error) {
@@ -246,6 +300,25 @@ export default function TareasListadoPage() {
 
   function removeAltaCopy(userId: string) {
     setAltaCopies((prev) => prev.filter((id) => id !== userId));
+  }
+
+  async function handlePickedAltaFile(kind: "foto" | "archivo", file: File | null) {
+    if (!file) return;
+    if (file.size > MAX_WORKSPACE_TASK_ATTACHMENT_BYTES) {
+      setMessage(
+        `El archivo "${file.name}" supera los 20 MB permitidos.`,
+      );
+      return;
+    }
+    setAltaUploadingAttachment(true);
+    try {
+      setAltaAttachments((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), file, kind },
+      ]);
+    } finally {
+      setAltaUploadingAttachment(false);
+    }
   }
 
   function lastActionPreview(taskId: string): string | null {
@@ -321,6 +394,39 @@ export default function TareasListadoPage() {
         </div>
         {showAlta ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              id="alta-photo-input"
+              onChange={(e) => {
+                const file = e.currentTarget.files?.item(0) ?? null;
+                e.currentTarget.value = "";
+                void handlePickedAltaFile("foto", file);
+              }}
+            />
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              id="alta-camera-input"
+              onChange={(e) => {
+                const file = e.currentTarget.files?.item(0) ?? null;
+                e.currentTarget.value = "";
+                void handlePickedAltaFile("foto", file);
+              }}
+            />
+            <input
+              type="file"
+              className="hidden"
+              id="alta-file-input"
+              onChange={(e) => {
+                const file = e.currentTarget.files?.item(0) ?? null;
+                e.currentTarget.value = "";
+                void handlePickedAltaFile("archivo", file);
+              }}
+            />
             <div className="grid gap-2 sm:col-span-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
                 Tipo de tarea
@@ -557,8 +663,70 @@ export default function TareasListadoPage() {
                 value={altaPrimerMensaje}
                 onChange={(e) => setAltaPrimerMensaje(e.target.value)}
                 placeholder="Escribe el primer avance / instrucción…"
-                disabled={creating}
+                disabled={creating || altaUploadingAttachment}
               />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    (document.getElementById("alta-camera-input") as HTMLInputElement | null)?.click()
+                  }
+                  disabled={creating || altaUploadingAttachment}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                >
+                  Tomar foto
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    (document.getElementById("alta-photo-input") as HTMLInputElement | null)?.click()
+                  }
+                  disabled={creating || altaUploadingAttachment}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                >
+                  Subir foto
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    (document.getElementById("alta-file-input") as HTMLInputElement | null)?.click()
+                  }
+                  disabled={creating || altaUploadingAttachment}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                >
+                  Subir archivo
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Adjuntos hasta 20 MB (bucket: {WORKSPACE_TASK_ATTACHMENT_BUCKET}).
+                </span>
+              </div>
+              {altaAttachments.length > 0 ? (
+                <div className="mt-2 grid gap-2">
+                  {altaAttachments.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-200"
+                    >
+                      <span className="font-semibold">
+                        {a.kind === "foto" ? "Foto" : "Archivo"}: {a.file.name}{" "}
+                        <span className="font-normal text-slate-500 dark:text-slate-400">
+                          ({formatBytes(a.file.size)})
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAltaAttachments((prev) => prev.filter((x) => x.id !== a.id))
+                        }
+                        disabled={creating}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800 dark:text-slate-300 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/10 dark:hover:text-rose-200"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </label>
             <label className="grid gap-1.5 text-sm sm:col-span-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
