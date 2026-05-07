@@ -57,6 +57,7 @@ export default function TareasDashboardPage() {
   const { workspaceId, appUser } = useWorkspace();
 
   const [tasks, setTasks] = useState<WorkspaceTaskRow[]>([]);
+  const [copiedTaskIds, setCopiedTaskIds] = useState<Set<string>>(new Set());
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [members, setMembers] = useState<WorkspaceMemberRow[]>([]);
   const [lastNoteByTaskId, setLastNoteByTaskId] = useState<
@@ -79,15 +80,29 @@ export default function TareasDashboardPage() {
       setMessage(null);
       try {
         const supabase = getSupabaseBrowserClient();
-        const [list, customerList, memberList] = await Promise.all([
+        const [list, customerList, memberList, copyRows] = await Promise.all([
           listWorkspaceTasks(supabase, workspaceId),
           listCustomers(supabase, workspaceId),
           listMembers(supabase, workspaceId),
+          // "Copia para mí" (CC): opcional / best-effort.
+          supabase
+            .from("workspace_task_copies")
+            .select("workspace_task_id")
+            .eq("workspace_id", workspaceId)
+            .eq("copied_user_id", appUser.id)
+            .returns<{ workspace_task_id: string }[]>(),
         ]);
         if (cancelled) return;
         setTasks(list);
         setCustomers(customerList);
         setMembers(memberList);
+        try {
+          const { data, error } = copyRows as any;
+          if (error) throw error;
+          setCopiedTaskIds(new Set((data ?? []).map((r: any) => r.workspace_task_id)));
+        } catch {
+          setCopiedTaskIds(new Set());
+        }
 
         const taskIds = list.map((t) => t.id);
         if (taskIds.length === 0) {
@@ -163,6 +178,17 @@ export default function TareasDashboardPage() {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [tasks, appUser.id]);
+
+  const copiedForMe = useMemo(() => {
+    if (copiedTaskIds.size === 0) return [];
+    // "Copia para mí" es informativo: excluye tareas donde soy responsable (ya están arriba).
+    const list = tasks.filter(
+      (t) => copiedTaskIds.has(t.id) && t.assigned_to_user_id !== appUser.id,
+    );
+    return [...list].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    );
+  }, [tasks, copiedTaskIds, appUser.id]);
 
   const createdByMe = useMemo(() => {
     return tasks.filter((t) => t.created_by_user_id === appUser.id);
@@ -366,6 +392,92 @@ export default function TareasDashboardPage() {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="grid gap-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                  Informativo
+                </p>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Con copia para mí
+                </h3>
+              </div>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {copiedForMe.length} tarea(s)
+              </span>
+            </div>
+
+            {copiedForMe.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
+                No tienes tareas en copia por ahora.
+              </div>
+            ) : (
+              <ul className="grid gap-2">
+                {copiedForMe.slice(0, 12).map((t) => (
+                  <li key={t.id}>
+                    <Link
+                      href={`/app/tareas/${t.id}`}
+                      className="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50/30 dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/5"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {t.titulo}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                            {lastActionPreview(t.id) ? (
+                              <>
+                                <span className="font-semibold">Último mensaje:</span>{" "}
+                                {lastActionPreview(t.id)}
+                              </>
+                            ) : (
+                              <span className="text-slate-500 dark:text-slate-500">
+                                Sin notas aún.
+                              </span>
+                            )}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="rounded-lg border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-indigo-800 dark:border-indigo-400/30 dark:bg-indigo-400/10 dark:text-indigo-200">
+                              CC (copia)
+                            </span>
+                            <span className="rounded-lg border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                              {labelEstado(t.estado)}
+                            </span>
+                            <span className="rounded-lg border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                              {labelPrioridad(t.prioridad)}
+                            </span>
+                            <span className="rounded-lg border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                              {t.customer_id
+                                ? `Cliente: ${customersById.get(t.customer_id)?.label ?? "—"}`
+                                : "Interna"}
+                            </span>
+                            <span className="rounded-lg border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                              Responsable: {responsableLabel(t.assigned_to_user_id)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right text-xs">
+                          <p className="font-semibold text-slate-700 dark:text-slate-200">
+                            Vence: {formatDue(t.vence_el)}
+                          </p>
+                          <p className="mt-1 text-slate-500 dark:text-slate-400">
+                            Abrir →
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {copiedForMe.length > 12 ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Mostrando 12 de {copiedForMe.length}. Usa el listado para ver todas.
+              </p>
+            ) : null}
           </section>
 
           <section className="grid gap-3">

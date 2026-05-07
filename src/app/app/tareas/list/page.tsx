@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -23,6 +23,8 @@ import {
   type WorkspaceTaskPrioridad,
   type WorkspaceTaskRow,
 } from "@/lib/workspace-tasks/workspace-tasks-db";
+import { createWorkspaceTaskNote } from "@/lib/workspace-tasks/workspace-task-notes-db";
+import { addWorkspaceTaskCopy } from "@/lib/workspace-tasks/workspace-task-copies-db";
 import {
   MODULE_BAR,
   MODULE_CHIP,
@@ -63,6 +65,9 @@ export default function TareasListadoPage() {
   const [altaPrioridad, setAltaPrioridad] =
     useState<WorkspaceTaskPrioridad>("normal");
   const [altaVenceElLocal, setAltaVenceElLocal] = useState("");
+  const [altaPrimerMensaje, setAltaPrimerMensaje] = useState("");
+  const [altaCopyToUserId, setAltaCopyToUserId] = useState("");
+  const [altaCopies, setAltaCopies] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
 
   function toDatetimeLocalValue(iso: string | null): string {
@@ -88,6 +93,12 @@ export default function TareasListadoPage() {
   useEffect(() => {
     if (searchParams.get("new") === "1") setShowAlta(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!showAlta) return;
+    // Default: vencer ahora mismo al abrir el alta.
+    if (!altaVenceElLocal) setAltaVenceElLocal(addMsToNow(0));
+  }, [showAlta, altaVenceElLocal]);
 
   useEffect(() => {
     if (isExterno) return undefined;
@@ -164,6 +175,26 @@ export default function TareasListadoPage() {
           ? altaAssignedToUserId
           : null,
       });
+
+      // Copias (opcional)
+      if (altaCopies.length > 0) {
+        await Promise.all(
+          altaCopies.map((userId) =>
+            addWorkspaceTaskCopy(supabase, workspaceId, created.id, userId),
+          ),
+        );
+      }
+
+      // Primer mensaje (opcional): crea primera nota en el hilo.
+      if (altaPrimerMensaje.trim()) {
+        await createWorkspaceTaskNote(
+          supabase,
+          workspaceId,
+          created.id,
+          altaPrimerMensaje.trim(),
+        );
+      }
+
       setTasks((prev) => [created, ...prev]);
       setAltaScope("interna");
       setAltaCustomerId("");
@@ -173,7 +204,10 @@ export default function TareasListadoPage() {
       setAltaDescripcion("");
       setAltaEstado("pendiente");
       setAltaPrioridad("normal");
-      setAltaVenceElLocal("");
+      setAltaVenceElLocal(addMsToNow(0));
+      setAltaPrimerMensaje("");
+      setAltaCopyToUserId("");
+      setAltaCopies([]);
       setShowAlta(false);
       setMessage("Tarea creada.");
     } catch (error) {
@@ -201,6 +235,18 @@ export default function TareasListadoPage() {
   );
   const altaAssignedOrphan =
     altaAssignedToUserId && !assignableIds.has(altaAssignedToUserId);
+
+  const altaCopiesSet = useMemo(() => new Set(altaCopies), [altaCopies]);
+
+  function addAltaCopy(userId: string) {
+    if (!userId) return;
+    if (altaCopiesSet.has(userId)) return;
+    setAltaCopies((prev) => [...prev, userId]);
+  }
+
+  function removeAltaCopy(userId: string) {
+    setAltaCopies((prev) => prev.filter((id) => id !== userId));
+  }
 
   function lastActionPreview(taskId: string): string | null {
     const last = lastNoteByTaskId[taskId];
@@ -440,6 +486,80 @@ export default function TareasListadoPage() {
                 Se elige de miembros reales del workspace con invitación aceptada.
               </span>
             </label>
+
+            <label className="grid gap-1.5 text-sm sm:col-span-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Copia para (opcional)
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className={controlClass}
+                  value={altaCopyToUserId}
+                  onChange={(e) => setAltaCopyToUserId(e.target.value)}
+                  disabled={creating}
+                >
+                  <option value="">Selecciona un miembro…</option>
+                  {assignable.map((m) =>
+                    m.user_id ? (
+                      <option key={m.id} value={m.user_id}>
+                        {m.email}
+                      </option>
+                    ) : null,
+                  )}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    addAltaCopy(altaCopyToUserId);
+                    setAltaCopyToUserId("");
+                  }}
+                  disabled={creating || !altaCopyToUserId}
+                  className="rounded-xl border border-emerald-500/40 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-slate-900/60 dark:text-emerald-200 dark:hover:bg-emerald-400/10"
+                >
+                  Agregar copia
+                </button>
+              </div>
+              {altaCopies.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {altaCopies.map((userId) => (
+                    <button
+                      key={userId}
+                      type="button"
+                      onClick={() => removeAltaCopy(userId)}
+                      disabled={creating}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/10"
+                      title="Quitar copia"
+                    >
+                      {assignable.find((m) => m.user_id === userId)?.email ??
+                        "Usuario"}
+                      <span
+                        aria-hidden
+                        className="text-[12px] text-slate-500 dark:text-slate-400"
+                      >
+                        ×
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Usuarios en copia verán la actividad de esta tarea.
+                </span>
+              )}
+            </label>
+
+            <label className="grid gap-1.5 text-sm sm:col-span-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                Primer mensaje (opcional)
+              </span>
+              <textarea
+                className={`${controlClass} min-h-[88px] resize-y`}
+                value={altaPrimerMensaje}
+                onChange={(e) => setAltaPrimerMensaje(e.target.value)}
+                placeholder="Escribe el primer avance / instrucción…"
+                disabled={creating}
+              />
+            </label>
             <label className="grid gap-1.5 text-sm sm:col-span-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
                 Vencimiento
@@ -452,6 +572,14 @@ export default function TareasListadoPage() {
                 disabled={creating}
               />
               <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAltaVenceElLocal(addMsToNow(0))}
+                  disabled={creating}
+                  className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 transition hover:border-rose-400 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200"
+                >
+                  Ahora mismo
+                </button>
                 <button
                   type="button"
                   onClick={() =>
