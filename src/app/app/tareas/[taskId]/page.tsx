@@ -34,6 +34,12 @@ import {
   type WorkspaceTaskNoteRow,
 } from "@/lib/workspace-tasks/workspace-task-notes-db";
 import {
+  addWorkspaceTaskCopy,
+  listWorkspaceTaskCopies,
+  removeWorkspaceTaskCopy,
+  type WorkspaceTaskCopyRow,
+} from "@/lib/workspace-tasks/workspace-task-copies-db";
+import {
   MODULE_BAR,
   MODULE_CHIP,
   MODULE_ICON_BG,
@@ -84,6 +90,7 @@ export default function TareaDetallePage() {
   const [assignable, setAssignable] = useState<WorkspaceMemberRow[]>([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [notes, setNotes] = useState<WorkspaceTaskNoteRow[]>([]);
+  const [copies, setCopies] = useState<WorkspaceTaskCopyRow[]>([]);
   const [noteBody, setNoteBody] = useState("");
   const [postingNote, setPostingNote] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -100,6 +107,9 @@ export default function TareaDetallePage() {
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [copyToUserId, setCopyToUserId] = useState("");
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copiesEnabled, setCopiesEnabled] = useState(true);
 
   const [scope, setScope] = useState<TaskScope>("interna");
   const [customerId, setCustomerId] = useState<string>("");
@@ -141,6 +151,19 @@ export default function TareaDetallePage() {
         setAssignable(workspaceMembersAssignable(members));
         setCustomers(customerList);
         setNotes(noteList);
+        // "Copia para" es opcional. Si la tabla no existe, no debe romper la pantalla.
+        try {
+          const copyList = await listWorkspaceTaskCopies(supabase, workspaceId, taskId);
+          if (!cancelled) {
+            setCopies(copyList);
+            setCopiesEnabled(true);
+          }
+        } catch {
+          if (!cancelled) {
+            setCopies([]);
+            setCopiesEnabled(false);
+          }
+        }
         if (!row) {
           setTask(null);
           setTaskReady(true);
@@ -236,6 +259,47 @@ export default function TareaDetallePage() {
       setMessage(formatError(error, "No se pudo reasignar la tarea."));
     } finally {
       setReassigning(false);
+    }
+  }
+
+  async function handleAddCopy() {
+    if (!taskId || !taskReady || !task) return;
+    if (!copiesEnabled) return;
+    if (!copyToUserId) return;
+    setCopyBusy(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const created = await addWorkspaceTaskCopy(
+        supabase,
+        workspaceId,
+        taskId,
+        copyToUserId,
+      );
+      setCopies((prev) => [...prev, created]);
+      setCopyToUserId("");
+      setMessage("Copia agregada.");
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo agregar la copia."));
+    } finally {
+      setCopyBusy(false);
+    }
+  }
+
+  async function handleRemoveCopy(copiedUserId: string) {
+    if (!taskId || !taskReady || !task) return;
+    if (!copiesEnabled) return;
+    setCopyBusy(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      await removeWorkspaceTaskCopy(supabase, workspaceId, taskId, copiedUserId);
+      setCopies((prev) => prev.filter((c) => c.copied_user_id !== copiedUserId));
+      setMessage("Copia eliminada.");
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo quitar la copia."));
+    } finally {
+      setCopyBusy(false);
     }
   }
 
@@ -729,6 +793,70 @@ export default function TareaDetallePage() {
                       ) : null,
                     )}
                   </select>
+                </label>
+
+                <label className="grid gap-1.5 text-sm sm:col-span-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                    Copia para (opcional)
+                  </span>
+                  {!copiesEnabled ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      (Opcional) Activa “Copia para” corriendo la migración de
+                      <span className="font-semibold"> workspace_task_copies</span>.
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      className={controlClass}
+                      value={copyToUserId}
+                      onChange={(e) => setCopyToUserId(e.target.value)}
+                      disabled={copyBusy || !copiesEnabled}
+                    >
+                      <option value="">Selecciona un miembro…</option>
+                      {assignable.map((m) =>
+                        m.user_id ? (
+                          <option key={m.id} value={m.user_id}>
+                            {m.email} · {ROL_SHORT[m.rol]}
+                          </option>
+                        ) : null,
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void handleAddCopy()}
+                      disabled={!copyToUserId || copyBusy || !copiesEnabled}
+                      className="rounded-xl border border-emerald-500/40 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-slate-900/60 dark:text-emerald-200 dark:hover:bg-emerald-400/10"
+                    >
+                      {copyBusy ? "Aplicando…" : "Agregar copia"}
+                    </button>
+                  </div>
+                  {copies.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {copies.map((c) => {
+                        const email =
+                          membersByUserId.get(c.copied_user_id)?.email ?? "Usuario";
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => void handleRemoveCopy(c.copied_user_id)}
+                            disabled={copyBusy}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/10"
+                            title="Quitar copia"
+                          >
+                            {email}
+                            <span aria-hidden className="text-[12px] text-slate-500 dark:text-slate-400">
+                              ×
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      Los usuarios en “copia” reciben avisos cuando hay notas nuevas.
+                    </p>
+                  )}
                 </label>
 
                 <label className="grid gap-1.5 text-sm">
