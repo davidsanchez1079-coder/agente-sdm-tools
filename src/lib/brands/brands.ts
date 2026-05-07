@@ -5,6 +5,7 @@ export type BrandId =
   | "korloy"
   | "dormer"
   | "amec"
+  | "gesac"
   | "otro";
 
 export type BrandStatus = "always" | "indexed" | "coming_soon";
@@ -56,6 +57,12 @@ export const BRANDS: readonly Brand[] = [
     status: "coming_soon",
     description:
       "Especialista Amec. Enfocado a taladrado modular y entero.",
+  },
+  {
+    id: "gesac",
+    label: "GESAC",
+    status: "coming_soon",
+    description: "Fabricante GESAC. Entra próximamente.",
   },
   {
     id: "otro",
