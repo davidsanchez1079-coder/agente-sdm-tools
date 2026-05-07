@@ -69,6 +69,7 @@ export default function TareasDashboardPage() {
   >("todos");
   const [createdResponsableFilter, setCreatedResponsableFilter] =
     useState("todos");
+  const [createdClienteFilter, setCreatedClienteFilter] = useState("todos");
 
   useEffect(() => {
     if (isExterno) return;
@@ -187,6 +188,18 @@ export default function TareasDashboardPage() {
     return [...options.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [createdByMe, membersByUserId]);
 
+  const createdClienteOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const t of createdByMe) {
+      if (!t.customer_id) continue;
+      options.set(
+        t.customer_id,
+        customersById.get(t.customer_id)?.label ?? "Cliente",
+      );
+    }
+    return [...options.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [createdByMe, customersById]);
+
   const filteredCreatedByMe = useMemo(() => {
     return createdByMe.filter((t) => {
       const matchesEstado =
@@ -196,9 +209,19 @@ export default function TareasDashboardPage() {
         (createdResponsableFilter === "sin_responsable"
           ? !t.assigned_to_user_id
           : t.assigned_to_user_id === createdResponsableFilter);
-      return matchesEstado && matchesResponsable;
+      const matchesCliente =
+        createdClienteFilter === "todos" ||
+        (createdClienteFilter === "sin_cliente"
+          ? !t.customer_id
+          : t.customer_id === createdClienteFilter);
+      return matchesEstado && matchesResponsable && matchesCliente;
     });
-  }, [createdByMe, createdEstadoFilter, createdResponsableFilter]);
+  }, [
+    createdByMe,
+    createdEstadoFilter,
+    createdResponsableFilter,
+    createdClienteFilter,
+  ]);
 
   if (isExterno) return <NoAccess titulo="Dashboard de tareas" />;
 
@@ -408,6 +431,25 @@ export default function TareasDashboardPage() {
                   ))}
                 </select>
               </label>
+
+              <label className="grid min-w-[220px] gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                  Cliente / Interna
+                </span>
+                <select
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-200"
+                  value={createdClienteFilter}
+                  onChange={(e) => setCreatedClienteFilter(e.target.value)}
+                >
+                  <option value="todos">Todos: clientes e internas</option>
+                  <option value="sin_cliente">Interna / Sin cliente</option>
+                  {createdClienteOptions.map(([customerId, label]) => (
+                    <option key={customerId} value={customerId}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             {createdByMe.length === 0 ? (
@@ -457,6 +499,11 @@ export default function TareasDashboardPage() {
                               }`}
                             >
                               {labelPrioridad(t.prioridad)}
+                            </span>
+                            <span className="rounded-lg border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                              {t.customer_id
+                                ? `Cliente: ${customersById.get(t.customer_id)?.label ?? "—"}`
+                                : "Interna / Sin cliente"}
                             </span>
                             <span className="rounded-lg border border-slate-200 px-2 py-0.5 dark:border-slate-700">
                               Responsable: {responsableLabel(t.assigned_to_user_id)}
