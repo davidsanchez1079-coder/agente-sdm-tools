@@ -42,6 +42,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background: radial-gradient(
       circle at 15% -10%,
       rgba(16, 185, 129, 0.08),
@@ -71,6 +72,268 @@ body {
       transparent 45%
     ),
     var(--background);
+}
+
+.gotia-bg {
+  --gotia-mx: 0.5;
+  --gotia-my: 0.35;
+  --gotia-scroll: 0;
+  contain: paint;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.gotia-bg__stars,
+.gotia-bg__mesh,
+.gotia-bg__orbs,
+.gotia-bg__noise,
+.gotia-bg__vignette {
+  position: absolute;
+  inset: -10vh;
+}
+
+.gotia-bg__stars {
+  inset: -25vh;
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.55), transparent 55%),
+    radial-gradient(1px 1px at 28% 62%, rgba(255, 255, 255, 0.35), transparent 55%),
+    radial-gradient(1px 1px at 41% 33%, rgba(255, 255, 255, 0.28), transparent 55%),
+    radial-gradient(1px 1px at 67% 22%, rgba(255, 255, 255, 0.45), transparent 55%),
+    radial-gradient(1px 1px at 73% 71%, rgba(255, 255, 255, 0.32), transparent 55%),
+    radial-gradient(1px 1px at 86% 39%, rgba(255, 255, 255, 0.26), transparent 55%),
+    radial-gradient(1px 1px at 18% 82%, rgba(255, 255, 255, 0.22), transparent 55%),
+    radial-gradient(1px 1px at 92% 88%, rgba(255, 255, 255, 0.18), transparent 55%);
+  opacity: 0.22;
+  filter: blur(0.2px);
+  transform:
+    translate3d(
+      calc((var(--gotia-mx) - 0.5) * -10px),
+      calc((var(--gotia-my) - 0.5) * -10px),
+      -120px
+    )
+    rotateX(calc((var(--gotia-my) - 0.5) * 5deg))
+    rotateY(calc((var(--gotia-mx) - 0.5) * -7deg))
+    scale(1.25);
+  animation: gotia-stars-drift 46s linear infinite;
+}
+
+.dark .gotia-bg__stars {
+  opacity: 0.32;
+}
+
+.gotia-bg__mesh {
+  background:
+    radial-gradient(
+      1200px circle at calc(var(--gotia-mx) * 100%) calc(var(--gotia-my) * 100%),
+      rgba(34, 211, 238, 0.18),
+      transparent 55%
+    ),
+    radial-gradient(
+      1000px circle at calc((1 - var(--gotia-mx)) * 100%) calc((0.15 + var(--gotia-my)) * 100%),
+      rgba(16, 185, 129, 0.18),
+      transparent 55%
+    ),
+    radial-gradient(
+      900px circle at 50% calc((0.85 + var(--gotia-scroll) * 0.25) * 100%),
+      rgba(99, 102, 241, 0.12),
+      transparent 60%
+    );
+  filter: blur(18px) saturate(1.15);
+  transform:
+    translate3d(
+      calc((var(--gotia-mx) - 0.5) * -22px),
+      calc((var(--gotia-my) - 0.5) * -22px),
+      -40px
+    )
+    rotateX(calc((var(--gotia-my) - 0.5) * 3deg))
+    rotateY(calc((var(--gotia-mx) - 0.5) * -4deg))
+    scale(1.05);
+  opacity: 0.9;
+  animation: gotia-nebula-drift 28s ease-in-out infinite;
+}
+
+.dark .gotia-bg__mesh {
+  background:
+    radial-gradient(
+      1200px circle at calc(var(--gotia-mx) * 100%) calc(var(--gotia-my) * 100%),
+      rgba(34, 211, 238, 0.25),
+      transparent 55%
+    ),
+    radial-gradient(
+      1000px circle at calc((1 - var(--gotia-mx)) * 100%) calc((0.15 + var(--gotia-my)) * 100%),
+      rgba(16, 185, 129, 0.22),
+      transparent 55%
+    ),
+    radial-gradient(
+      900px circle at 50% calc((0.85 + var(--gotia-scroll) * 0.25) * 100%),
+      rgba(99, 102, 241, 0.18),
+      transparent 60%
+    );
+  filter: blur(18px) saturate(1.05);
+  opacity: 0.85;
+}
+
+.gotia-bg__orbs {
+  background:
+    radial-gradient(
+      520px circle at calc((var(--gotia-mx) * 100%) + 10%) calc((var(--gotia-my) * 100%) - 5%),
+      rgba(255, 255, 255, 0.32),
+      transparent 60%
+    ),
+    radial-gradient(
+      560px circle at calc((1 - var(--gotia-mx)) * 100%) calc((0.9 - var(--gotia-my) * 0.4) * 100%),
+      rgba(255, 255, 255, 0.18),
+      transparent 62%
+    );
+  mix-blend-mode: soft-light;
+  filter: blur(10px);
+  transform:
+    translate3d(
+      calc((var(--gotia-mx) - 0.5) * 34px),
+      calc((var(--gotia-my) - 0.5) * 24px),
+      20px
+    )
+    rotateX(calc((var(--gotia-my) - 0.5) * 4deg))
+    rotateY(calc((var(--gotia-mx) - 0.5) * -6deg))
+    scale(1.02);
+  opacity: 0.7;
+  animation: gotia-float 18s ease-in-out infinite;
+}
+
+.dark .gotia-bg__orbs {
+  mix-blend-mode: screen;
+  opacity: 0.5;
+}
+
+.gotia-bg__noise {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.04) 1px,
+    rgba(0, 0, 0, 0.02) 2px,
+    rgba(0, 0, 0, 0.02) 3px
+  );
+  opacity: 0.14;
+  mix-blend-mode: overlay;
+  transform: translateZ(0);
+}
+
+.dark .gotia-bg__noise {
+  opacity: 0.12;
+  mix-blend-mode: soft-light;
+}
+
+.gotia-bg__vignette {
+  background: radial-gradient(
+    circle at 50% 30%,
+    transparent 0%,
+    rgba(2, 6, 23, 0.08) 55%,
+    rgba(2, 6, 23, 0.18) 78%,
+    rgba(2, 6, 23, 0.32) 100%
+  );
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.dark .gotia-bg__vignette {
+  opacity: 0.55;
+}
+
+@keyframes gotia-float {
+  0% {
+    transform:
+      translate3d(
+        calc((var(--gotia-mx) - 0.5) * 34px),
+        calc((var(--gotia-my) - 0.5) * 24px),
+        20px
+      )
+      rotateX(calc((var(--gotia-my) - 0.5) * 4deg))
+      rotateY(calc((var(--gotia-mx) - 0.5) * -6deg))
+      scale(1.02);
+  }
+  50% {
+    transform:
+      translate3d(
+        calc((var(--gotia-mx) - 0.5) * 28px),
+        calc((var(--gotia-my) - 0.5) * 30px),
+        26px
+      )
+      rotateX(calc((var(--gotia-my) - 0.5) * 4deg))
+      rotateY(calc((var(--gotia-mx) - 0.5) * -6deg))
+      scale(1.04);
+  }
+  100% {
+    transform:
+      translate3d(
+        calc((var(--gotia-mx) - 0.5) * 34px),
+        calc((var(--gotia-my) - 0.5) * 24px),
+        20px
+      )
+      rotateX(calc((var(--gotia-my) - 0.5) * 4deg))
+      rotateY(calc((var(--gotia-mx) - 0.5) * -6deg))
+      scale(1.02);
+  }
+}
+
+@keyframes gotia-nebula-drift {
+  0% {
+    filter: blur(18px) saturate(1.12);
+  }
+  50% {
+    filter: blur(20px) saturate(1.22);
+  }
+  100% {
+    filter: blur(18px) saturate(1.12);
+  }
+}
+
+@keyframes gotia-stars-drift {
+  0% {
+    transform:
+      translate3d(
+        calc((var(--gotia-mx) - 0.5) * -10px),
+        calc((var(--gotia-my) - 0.5) * -10px),
+        -120px
+      )
+      rotateX(calc((var(--gotia-my) - 0.5) * 5deg))
+      rotateY(calc((var(--gotia-mx) - 0.5) * -7deg))
+      scale(1.25);
+    opacity: 0.2;
+  }
+  50% {
+    transform:
+      translate3d(
+        calc((var(--gotia-mx) - 0.5) * -14px),
+        calc((var(--gotia-my) - 0.5) * -6px),
+        -120px
+      )
+      rotateX(calc((var(--gotia-my) - 0.5) * 5deg))
+      rotateY(calc((var(--gotia-mx) - 0.5) * -7deg))
+      scale(1.27);
+    opacity: 0.26;
+  }
+  100% {
+    transform:
+      translate3d(
+        calc((var(--gotia-mx) - 0.5) * -10px),
+        calc((var(--gotia-my) - 0.5) * -10px),
+        -120px
+      )
+      rotateX(calc((var(--gotia-my) - 0.5) * 5deg))
+      rotateY(calc((var(--gotia-mx) - 0.5) * -7deg))
+      scale(1.25);
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gotia-bg__stars,
+  .gotia-bg__mesh {
+    animation: none;
+  }
+  .gotia-bg__orbs {
+    animation: none;
+  }
 }
 
 a {

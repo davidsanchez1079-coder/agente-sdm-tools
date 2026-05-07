@@ -10,6 +10,7 @@ import {
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
 import type { WorkspaceRol } from "@/lib/workspace/bootstrap";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 const NAV_ORDER: ModuleId[] = [
   "dashboard",
@@ -90,15 +91,18 @@ export function Sidebar({
               </p>
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Expandir menú" : "Minimizar menú"}
-            title={collapsed ? "Expandir menú" : "Minimizar menú"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-sm text-slate-600 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200"
-          >
-            {collapsed ? "»" : "«"}
-          </button>
+          <div className="flex items-center gap-2">
+            {collapsed ? null : <NotificationBell />}
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-label={collapsed ? "Expandir menú" : "Minimizar menú"}
+              title={collapsed ? "Expandir menú" : "Minimizar menú"}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-sm text-slate-600 transition hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 dark:border-slate-800 dark:text-slate-300 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200"
+            >
+              {collapsed ? "»" : "«"}
+            </button>
+          </div>
         </div>
 
         <nav className="flex flex-col gap-1">
@@ -183,6 +187,7 @@ export function Sidebar({
             {userName}
           </p>
         </div>
+        <NotificationBell />
         <button
           type="button"
           onClick={onToggleTheme}

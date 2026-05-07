@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useIsExterno, useWorkspace } from "@/lib/workspace/context";
 import { NoAccess } from "@/components/layout/no-access";
@@ -19,6 +19,8 @@ import { workspaceMembersAssignable } from "@/lib/workspace-tasks/workspace-task
 import {
   getWorkspaceTaskById,
   updateWorkspaceTask,
+  deleteWorkspaceTask,
+  hardDeleteWorkspaceTask,
   type WorkspaceTaskEstado,
   type WorkspaceTaskPrioridad,
   type WorkspaceTaskRow,
@@ -38,6 +40,7 @@ import {
 } from "@/lib/modules/modules";
 import { ModuleIcon } from "@/components/ui/module-icon";
 import { formatError } from "@/lib/errors/format";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const ROL_SHORT: Record<WorkspaceMemberRow["rol"], string> = {
   gerente: "Gerente",
@@ -71,6 +74,7 @@ type ReassignDuePreset = "keep" | "now" | "1h" | "3h" | "1d" | "1w";
 
 export default function TareaDetallePage() {
   const params = useParams();
+  const router = useRouter();
   const taskId = typeof params.taskId === "string" ? params.taskId : "";
   const isExterno = useIsExterno();
   const { workspaceId, appUser } = useWorkspace();
@@ -94,6 +98,8 @@ export default function TareaDetallePage() {
   const [internalLoading, setInternalLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [scope, setScope] = useState<TaskScope>("interna");
   const [customerId, setCustomerId] = useState<string>("");
@@ -408,6 +414,23 @@ export default function TareaDetallePage() {
       setMessage(formatError(error, "No se pudo guardar el adjunto."));
     } finally {
       setUploadingAttachment(false);
+    }
+  }
+
+  async function handleDeleteTask() {
+    if (!taskId || !task) return;
+    setDeleting(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+
+      await deleteWorkspaceTask(supabase, workspaceId, taskId);
+      setDeleteOpen(false);
+      router.replace("/app/tareas");
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo eliminar la tarea."));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -756,6 +779,24 @@ export default function TareaDetallePage() {
                 </span>
               </div>
             </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/60 p-4 dark:border-rose-500/30 dark:bg-rose-500/10">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-rose-900 dark:text-rose-100">
+                  Zona peligrosa
+                </p>
+                <p className="mt-1 text-xs text-rose-800/80 dark:text-rose-100/80">
+                  Eliminar mueve la tarea a la papelera por 15 días.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="shrink-0 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-500 dark:bg-rose-500 dark:hover:bg-rose-400"
+              >
+                Eliminar tarea
+              </button>
+            </div>
           </div>
 
           <details className="max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm open:shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
@@ -836,6 +877,18 @@ export default function TareaDetallePage() {
           </details>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Eliminar tarea"
+        description="La tarea se moverá a la papelera.\n\nSe conservará 15 días y después se eliminará automáticamente."
+        confirmLabel="Sí, mover a papelera"
+        cancelLabel="Cancelar"
+        tone="destructive"
+        busy={deleting}
+        onClose={() => (deleting ? null : setDeleteOpen(false))}
+        onConfirm={() => void handleDeleteTask()}
+      />
     </section>
   );
 }
