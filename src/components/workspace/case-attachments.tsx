@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
+  CASE_VIDEO_ATTACHMENTS_CAPTION,
   deleteAttachment,
   type AttachmentRow,
 } from "@/lib/workspace/attachments";
@@ -49,7 +50,8 @@ export function CaseAttachments({
           Adjuntos del caso ({attachments.length})
         </p>
         <span className="text-[10px] text-slate-500 dark:text-slate-400">
-          Toca para marcar / quitar del próximo mensaje
+          Toca para marcar / quitar del próximo mensaje.{" "}
+          {CASE_VIDEO_ATTACHMENTS_CAPTION}
         </span>
       </div>
 
@@ -86,7 +88,11 @@ export function CaseAttachments({
                   onClick={() => void onOpen(row)}
                   className="flex h-32 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400"
                 >
-                  {row.kind === "pdf" ? "PDF" : "Archivo"}
+                  {row.kind === "pdf"
+                    ? "PDF"
+                    : row.kind === "video"
+                      ? "Video"
+                      : "Archivo"}
                 </button>
               )}
               <div className="flex items-start justify-between gap-2">

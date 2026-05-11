@@ -74,8 +74,15 @@ import {
 import { MessageContent } from "./message-content";
 import {
   ATTACHMENT_ACCEPT,
+  CASE_VIDEO_EVIDENCE_HELP_ID,
+  CASE_VIDEO_HELP_LINE_1,
+  CASE_VIDEO_HELP_LINE_2,
   MAX_ATTACHMENT_BYTES,
+  MAX_CASE_VIDEO_DURATION_SECONDS,
+  VIDEO_CAPTURE_ACCEPT,
+  assertCaseVideoMaxDuration,
   getSignedUrl,
+  isCaseVideoUploadFile,
   listAttachments,
   uploadAttachment,
   type AttachmentRow,
@@ -172,6 +179,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     string[]
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadCaption, setUploadCaption] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<
     Record<string, string>
@@ -179,6 +187,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [preview, setPreview] = useState<AttachmentPreview | null>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const videoCameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,6 +309,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     if (!files || files.length === 0) return;
     if (!caseItem) return;
     setUploading(true);
+    setUploadCaption(null);
     setUploadError(null);
     const supabase = getSupabaseBrowserClient();
     let current = attachments;
@@ -311,13 +321,23 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         );
         continue;
       }
+      const isVideo = isCaseVideoUploadFile(file);
       try {
-        const row = await uploadAttachment(supabase, caseItem.id, file);
+        if (isVideo) {
+          setUploadCaption("Comprobando duración del video…");
+          await assertCaseVideoMaxDuration(file);
+          setUploadCaption("Subiendo…");
+        }
+        const row = await uploadAttachment(supabase, caseItem.id, file, {
+          skipVideoDurationAssert: isVideo,
+        });
         current = [row, ...current];
         setAttachments(current);
         newlyUploaded.push(row.id);
       } catch (error) {
         setUploadError(formatError(error, `Error al subir "${file.name}".`));
+      } finally {
+        setUploadCaption(null);
       }
     }
     if (newlyUploaded.length > 0) {
@@ -906,6 +926,18 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 event.target.value = "";
               }}
             />
+            <input
+              ref={videoCameraRef}
+              type="file"
+              accept={VIDEO_CAPTURE_ACCEPT}
+              capture="environment"
+              className="hidden"
+              aria-describedby={CASE_VIDEO_EVIDENCE_HELP_ID}
+              onChange={(event) => {
+                void handleFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
 
             {selectedAttachmentIds.length > 0 ? (
               <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800/80 dark:bg-slate-900/40">
@@ -931,7 +963,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                         </span>
                       ) : (
                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-200 text-[9px] font-bold uppercase tracking-wider text-emerald-900 dark:bg-emerald-500/30 dark:text-emerald-50">
-                          {row.kind === "pdf" ? "PDF" : "Arch"}
+                          {row.kind === "pdf"
+                            ? "PDF"
+                            : row.kind === "video"
+                              ? "Vid"
+                              : "Arch"}
                         </span>
                       )}
                       <span
@@ -976,10 +1012,21 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
               placeholder={
                 selectedAttachmentIds.length > 0
                   ? "Escribe la instrucción sobre los adjuntos y envía."
-                  : "Escribe tu mensaje. Puedes adjuntar foto o PDF abajo."
+                  : `Escribe tu mensaje. Abajo puedes adjuntar foto, PDF o video de evidencia (máx. ${MAX_CASE_VIDEO_DURATION_SECONDS} s; lee el recuadro gris antes de grabar o elegir video).`
               }
               disabled={sending}
             />
+
+            <div
+              id={CASE_VIDEO_EVIDENCE_HELP_ID}
+              className="space-y-1 border-t border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-snug text-slate-600 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-400"
+            >
+              <p className="font-semibold text-slate-700 dark:text-slate-300">
+                Antes de grabar o elegir un video
+              </p>
+              <p>{CASE_VIDEO_HELP_LINE_1}</p>
+              <p>{CASE_VIDEO_HELP_LINE_2}</p>
+            </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-2 py-2 dark:border-slate-800/80 dark:bg-slate-900/40">
               <div className="flex flex-wrap items-center gap-1">
@@ -1009,10 +1056,35 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => videoCameraRef.current?.click()}
+                  disabled={uploading || sending}
+                  aria-describedby={CASE_VIDEO_EVIDENCE_HELP_ID}
+                  aria-label={`Grabar o elegir video de evidencia (máximo ${MAX_CASE_VIDEO_DURATION_SECONDS} segundos, sin recorte automático)`}
+                  title={`Video: en el móvil suele abrir la cámara. Máx. ${MAX_CASE_VIDEO_DURATION_SECONDS} s, MP4/MOV; sin recorte si te pasas del límite.`}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-200"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <rect x="2" y="6" width="14" height="12" rx="2" />
+                    <path d="M16 10l6-3v14l-6-3" />
+                  </svg>
+                  Video
+                </button>
+                <button
+                  type="button"
                   onClick={() => filePickerRef.current?.click()}
                   disabled={uploading || sending}
-                  aria-label="Adjuntar archivo"
-                  title="Adjuntar archivo"
+                  aria-label="Adjuntar imagen, PDF o video de evidencia"
+                  title={`Archivo: imagen, PDF o video MP4/MOV. Si es video: máx. ${MAX_CASE_VIDEO_DURATION_SECONDS} s, sin recorte automático.`}
                   className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-200 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-200"
                 >
                   <svg
@@ -1032,7 +1104,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                 </button>
                 {uploading ? (
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Subiendo…
+                    {uploadCaption ?? "Subiendo…"}
                   </span>
                 ) : null}
               </div>
@@ -1163,7 +1235,11 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
                           </span>
                         ) : (
                           <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-[9px] font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                            {row.kind === "pdf" ? "PDF" : "Arch"}
+                            {row.kind === "pdf"
+                              ? "PDF"
+                              : row.kind === "video"
+                                ? "Vid"
+                                : "Arch"}
                           </span>
                         )}
                         <span className="max-w-[18ch] truncate">
