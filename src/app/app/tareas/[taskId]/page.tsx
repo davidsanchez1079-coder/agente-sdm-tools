@@ -785,8 +785,17 @@ export default function TareaDetallePage() {
                     disabled={reassigning}
                   >
                     <option value="">Sin responsable</option>
+                    {task.created_by_user_id ? (
+                      <option value={task.created_by_user_id}>
+                        Creador ·{" "}
+                        {task.created_by_user_id === appUser.id
+                          ? "Tú"
+                          : membersByUserId.get(task.created_by_user_id)
+                              ?.email ?? "Usuario"}
+                      </option>
+                    ) : null}
                     {assignable.map((m) =>
-                      m.user_id ? (
+                      m.user_id && m.user_id !== task.created_by_user_id ? (
                         <option key={m.id} value={m.user_id}>
                           {m.email} · {ROL_SHORT[m.rol]}
                         </option>
