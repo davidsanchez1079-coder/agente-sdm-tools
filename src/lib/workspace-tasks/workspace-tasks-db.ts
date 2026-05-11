@@ -135,10 +135,18 @@ export async function updateWorkspaceTask(
     .update(patch)
     .eq("workspace_id", workspaceId)
     .eq("id", taskId)
-    .select(WORKSPACE_TASK_COLUMNS)
-    .single<WorkspaceTaskRow>();
+    .select(WORKSPACE_TASK_COLUMNS);
   if (error) throw error;
-  return data;
+  const rows = data ?? [];
+  if (rows.length === 0) {
+    throw new Error(
+      "No se pudo guardar la tarea: sin permiso o no se aplicó ningún cambio.",
+    );
+  }
+  if (rows.length > 1) {
+    throw new Error("Respuesta inesperada al actualizar la tarea.");
+  }
+  return rows[0] as WorkspaceTaskRow;
 }
 
 export async function deleteWorkspaceTask(
