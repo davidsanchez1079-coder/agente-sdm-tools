@@ -149,6 +149,21 @@ export async function updateWorkspaceTask(
   return rows[0] as WorkspaceTaskRow;
 }
 
+/** Sin `.select()`: evita RETURNING; útil si tras el cambio el actor ya no pasa la policy SELECT de la fila. */
+export async function updateWorkspaceTaskSilently(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  taskId: string,
+  patch: UpdateWorkspaceTaskPatch,
+): Promise<void> {
+  const { error } = await supabase
+    .from("workspace_tasks")
+    .update(patch)
+    .eq("workspace_id", workspaceId)
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
 export async function deleteWorkspaceTask(
   supabase: SupabaseClient,
   workspaceId: string,

@@ -19,6 +19,7 @@ import { workspaceMembersAssignable } from "@/lib/workspace-tasks/workspace-task
 import {
   getWorkspaceTaskById,
   updateWorkspaceTask,
+  updateWorkspaceTaskSilently,
   deleteWorkspaceTask,
   hardDeleteWorkspaceTask,
   type WorkspaceTaskEstado,
@@ -246,13 +247,23 @@ export default function TareaDetallePage() {
           : dueIsoByPreset[reassignDuePreset];
 
       const supabase = getSupabaseBrowserClient();
-      const updated = await updateWorkspaceTask(supabase, workspaceId, taskId, {
+      const patch = {
         assigned_to_user_id: reassignToUserId ? reassignToUserId : null,
         ...(venceEl ? { vence_el: venceEl } : {}),
-      });
-      setTask(updated);
-      setAssignedToUserId(updated.assigned_to_user_id ?? "");
-      setReassignToUserId(updated.assigned_to_user_id ?? "");
+      };
+      await updateWorkspaceTaskSilently(supabase, workspaceId, taskId, patch);
+      const nextAssigned = patch.assigned_to_user_id ?? null;
+      setTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              assigned_to_user_id: nextAssigned,
+              vence_el: venceEl !== undefined ? venceEl : prev.vence_el,
+            }
+          : prev,
+      );
+      setAssignedToUserId(nextAssigned ?? "");
+      setReassignToUserId(nextAssigned ?? "");
       setReassignDuePreset("keep");
       setMessage("Responsable actualizado.");
     } catch (error) {
