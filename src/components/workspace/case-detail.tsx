@@ -19,16 +19,13 @@ import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import {
   CASE_COLUMNS,
   deleteCase,
+  listCaseSecondaryUserIds,
+  replaceCaseSecondaryUserIds,
   updateCase,
   type CaseRow,
 } from "@/lib/workspace/folders";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  agenteFullName,
-  listAgentes,
-  type AgenteRow,
-} from "@/lib/agentes/agentes-db";
 import {
   BRANDS,
   ENABLED_AGENT_MODES,
@@ -141,7 +138,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingCase, setDeletingCase] = useState(false);
-  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
   const [savingSecondary, setSavingSecondary] = useState(false);
   const [savingMarca, setSavingMarca] = useState(false);
   const [savingConversion, setSavingConversion] = useState(false);
@@ -206,7 +202,9 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           setNotFound(true);
           return;
         }
-        setCaseItem(caseData);
+        const secIds = await listCaseSecondaryUserIds(supabase, caseData.id);
+        if (cancelled) return;
+        setCaseItem({ ...caseData, secondary_user_ids: secIds });
         setResumenDraft(caseData.resumen_ejecutivo ?? "");
         setSiguienteDraft(caseData.siguiente_accion ?? "");
         setPotencialDraft(
@@ -218,9 +216,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
         setSelectedAttachmentIds([]);
 
-        // Resuelve workspace_id del caso para listar agentes asignables
-        // del workspace correcto. Pasa por folders ya que cases.folder_id
-        // → folders.workspace_id.
+        // Resuelve workspace_id del caso para compartir y secundarios
+        // (usuarios del workspace). Pasa por folders: cases.folder_id → workspace_id.
         const [msgs, atts, folderRes] = await Promise.all([
           listMessages(supabase, caseId),
           listAttachments(supabase, caseId),
@@ -235,19 +232,9 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           setAttachments(atts);
           if (folderRes.data?.workspace_id) {
             try {
-              const list = await listAgentes(
-                supabase,
-                folderRes.data.workspace_id,
-                { onlyActive: true },
-              );
-              if (!cancelled) setAgentes(list);
-            } catch {
-              // Silencioso: si falla, el selector queda vacío.
-            }
-            try {
               const [activeShares, shareables] = await Promise.all([
                 listActiveShares(supabase, caseId),
-                listShareableMembers(supabase, folderRes.data.workspace_id),
+                listShareableMembers(supabase, folderRes.data.workspace_id, caseId),
               ]);
               if (!cancelled) {
                 setShares(activeShares);
@@ -573,22 +560,22 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
     }
   }
 
-  async function handleChangeSecondaryAgente(value: string) {
-    if (!caseItem) return;
-    const next = value || null;
-    if ((caseItem.secondary_agente_id ?? null) === next) return;
+  async function handleToggleSecondaryUser(userId: string) {
+    if (!caseItem || savingSecondary) return;
+    const prev = caseItem.secondary_user_ids ?? [];
+    const next = prev.includes(userId)
+      ? prev.filter((id) => id !== userId)
+      : [...prev, userId];
     setSavingSecondary(true);
     setMessage(null);
     try {
       const supabase = getSupabaseBrowserClient();
-      const updated = await updateCase(supabase, caseItem.id, {
-        secondary_agente_id: next,
-      });
-      setCaseItem(updated);
-      setMessage("Agente secundario actualizado.");
+      await replaceCaseSecondaryUserIds(supabase, caseItem.id, next);
+      setCaseItem({ ...caseItem, secondary_user_ids: next });
+      setMessage("Usuarios secundarios actualizados.");
     } catch (error) {
       setMessage(
-        formatError(error, "No se pudo actualizar el agente secundario."),
+        formatError(error, "No se pudo actualizar los usuarios secundarios."),
       );
     } finally {
       setSavingSecondary(false);
@@ -1313,27 +1300,48 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
             </select>
           </label>
 
-          <label className="grid gap-1.5 text-sm">
+          <div className="grid gap-2 text-sm sm:col-span-2 lg:col-span-3">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-              Agente secundario
+              Usuarios secundarios
             </span>
-            <select
-              className={controlClass}
-              value={caseItem.secondary_agente_id ?? ""}
-              onChange={(event) =>
-                void handleChangeSecondaryAgente(event.target.value)
-              }
-              disabled={savingSecondary}
-            >
-              <option value="">Sin asignar</option>
-              {agentes.map((agente) => (
-                <option key={agente.id} value={agente.id}>
-                  {agenteFullName(agente)}
-                  {agente.rol_label ? ` — ${agente.rol_label}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+            <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+              Miembros del workspace con cuenta. Puedes marcar varios; se
+              guardan al activar o quitar cada casilla.
+            </p>
+            <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-900/50">
+              {shareableMembers.length === 0 ? (
+                <p className="p-3 text-xs text-slate-500 dark:text-slate-400">
+                  No hay miembros para listar.
+                </p>
+              ) : (
+                shareableMembers.map((m) => {
+                  const checked = (caseItem.secondary_user_ids ?? []).includes(
+                    m.user_id,
+                  );
+                  return (
+                    <label
+                      key={m.user_id}
+                      className="flex cursor-pointer items-center gap-2 border-b border-slate-200 px-3 py-2.5 last:border-b-0 dark:border-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 dark:border-slate-600"
+                        checked={checked}
+                        disabled={savingSecondary}
+                        onChange={() => void handleToggleSecondaryUser(m.user_id)}
+                      />
+                      <span className="min-w-0 flex-1 text-slate-800 dark:text-slate-100">
+                        <span className="font-medium">{m.display_name}</span>
+                        <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                          {m.email} · {m.rol}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
           <label className="grid gap-1.5 text-sm">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
