@@ -19,8 +19,6 @@ import { listMessages, type MessageRow } from "@/lib/workspace/messages";
 import {
   CASE_COLUMNS,
   deleteCase,
-  listCaseSecondaryUserIds,
-  replaceCaseSecondaryUserIds,
   updateCase,
   type CaseRow,
 } from "@/lib/workspace/folders";
@@ -138,7 +136,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [caseItem, setCaseItem] = useState<CaseRow | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingCase, setDeletingCase] = useState(false);
-  const [savingSecondary, setSavingSecondary] = useState(false);
   const [savingMarca, setSavingMarca] = useState(false);
   const [savingConversion, setSavingConversion] = useState(false);
   const [shares, setShares] = useState<CaseShareRow[]>([]);
@@ -202,9 +199,7 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           setNotFound(true);
           return;
         }
-        const secIds = await listCaseSecondaryUserIds(supabase, caseData.id);
-        if (cancelled) return;
-        setCaseItem({ ...caseData, secondary_user_ids: secIds });
+        setCaseItem(caseData);
         setResumenDraft(caseData.resumen_ejecutivo ?? "");
         setSiguienteDraft(caseData.siguiente_accion ?? "");
         setPotencialDraft(
@@ -216,8 +211,8 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         setAgentMode(deriveAgentMode(caseData.marca_preferida));
         setSelectedAttachmentIds([]);
 
-        // Resuelve workspace_id del caso para compartir y secundarios
-        // (usuarios del workspace). Pasa por folders: cases.folder_id → workspace_id.
+        // Resuelve workspace_id del caso para compartir (case_shares).
+        // Pasa por folders: cases.folder_id → workspace_id.
         const [msgs, atts, folderRes] = await Promise.all([
           listMessages(supabase, caseId),
           listAttachments(supabase, caseId),
@@ -557,28 +552,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } finally {
       setSavingMarca(false);
-    }
-  }
-
-  async function handleToggleSecondaryUser(userId: string) {
-    if (!caseItem || savingSecondary) return;
-    const prev = caseItem.secondary_user_ids ?? [];
-    const next = prev.includes(userId)
-      ? prev.filter((id) => id !== userId)
-      : [...prev, userId];
-    setSavingSecondary(true);
-    setMessage(null);
-    try {
-      const supabase = getSupabaseBrowserClient();
-      await replaceCaseSecondaryUserIds(supabase, caseItem.id, next);
-      setCaseItem({ ...caseItem, secondary_user_ids: next });
-      setMessage("Usuarios secundarios actualizados.");
-    } catch (error) {
-      setMessage(
-        formatError(error, "No se pudo actualizar los usuarios secundarios."),
-      );
-    } finally {
-      setSavingSecondary(false);
     }
   }
 
@@ -1299,49 +1272,6 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
               ))}
             </select>
           </label>
-
-          <div className="grid gap-2 text-sm sm:col-span-2 lg:col-span-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-              Usuarios secundarios
-            </span>
-            <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-              Miembros del workspace con cuenta. Puedes marcar varios; se
-              guardan al activar o quitar cada casilla.
-            </p>
-            <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-900/50">
-              {shareableMembers.length === 0 ? (
-                <p className="p-3 text-xs text-slate-500 dark:text-slate-400">
-                  No hay miembros para listar.
-                </p>
-              ) : (
-                shareableMembers.map((m) => {
-                  const checked = (caseItem.secondary_user_ids ?? []).includes(
-                    m.user_id,
-                  );
-                  return (
-                    <label
-                      key={m.user_id}
-                      className="flex cursor-pointer items-center gap-2 border-b border-slate-200 px-3 py-2.5 last:border-b-0 dark:border-slate-700"
-                    >
-                      <input
-                        type="checkbox"
-                        className="rounded border-slate-300 dark:border-slate-600"
-                        checked={checked}
-                        disabled={savingSecondary}
-                        onChange={() => void handleToggleSecondaryUser(m.user_id)}
-                      />
-                      <span className="min-w-0 flex-1 text-slate-800 dark:text-slate-100">
-                        <span className="font-medium">{m.display_name}</span>
-                        <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
-                          {m.email} · {m.rol}
-                        </span>
-                      </span>
-                    </label>
-                  );
-                })
-              )}
-            </div>
-          </div>
 
           <label className="grid gap-1.5 text-sm">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">

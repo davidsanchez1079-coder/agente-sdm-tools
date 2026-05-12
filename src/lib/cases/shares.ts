@@ -126,6 +126,20 @@ export async function addShare(
   return data;
 }
 
+/** Tras crear un caso: comparte con varios miembros (mismo permiso). Omite al creador. */
+export async function addInitialCaseShares(
+  supabase: SupabaseClient,
+  caseId: string,
+  sharedByUserId: string,
+  members: ShareableMember[],
+  permission: CaseSharePermission,
+): Promise<void> {
+  for (const member of members) {
+    if (member.user_id === sharedByUserId) continue;
+    await addShare(supabase, caseId, member, sharedByUserId, permission);
+  }
+}
+
 export async function updateSharePermission(
   supabase: SupabaseClient,
   shareId: string,

@@ -35,6 +35,8 @@ export type CaseRow = {
   potencial_usd: number | null;
   created_by: string | null;
   secondary_agente_id: string | null;
+  /** `users.id` de destinatarios activos de `case_shares` (merge en listados). */
+  collaborator_user_ids?: string[];
   created_at: string;
 };
 
@@ -112,6 +114,52 @@ export async function ensureFolderForCustomer(
   return created.id;
 }
 
+async function mergeCaseShareCollaboratorUserIds(
+  supabase: SupabaseClient,
+  rows: CaseRow[] | null,
+): Promise<CaseRow[]> {
+  if (!rows?.length) return rows ?? [];
+  const ids = rows.map((r) => r.id);
+  const { data: shareRows, error } = await supabase
+    .from("case_shares")
+    .select("case_id, shared_with_member_id")
+    .in("case_id", ids)
+    .is("revoked_at", null);
+  if (error) throw error;
+  const memberIds = [
+    ...new Set(
+      (shareRows ?? [])
+        .map((r) => r.shared_with_member_id)
+        .filter((id): id is string => id != null && id !== ""),
+    ),
+  ];
+  const userByMember = new Map<string, string>();
+  if (memberIds.length) {
+    const { data: members, error: mErr } = await supabase
+      .from("workspace_members")
+      .select("id, user_id")
+      .in("id", memberIds)
+      .not("user_id", "is", null);
+    if (mErr) throw mErr;
+    for (const m of members ?? []) {
+      if (m.user_id) userByMember.set(m.id, m.user_id as string);
+    }
+  }
+  const byCase = new Map<string, string[]>();
+  for (const row of shareRows ?? []) {
+    if (!row.shared_with_member_id) continue;
+    const uid = userByMember.get(row.shared_with_member_id);
+    if (!uid) continue;
+    const list = byCase.get(row.case_id) ?? [];
+    list.push(uid);
+    byCase.set(row.case_id, list);
+  }
+  return rows.map((r) => ({
+    ...r,
+    collaborator_user_ids: [...new Set(byCase.get(r.id) ?? [])],
+  }));
+}
+
 // Lista cases visibles al usuario (RLS filtra al workspace) con filtro
 // opcional por cliente. Si customerLabel = null devuelve todos.
 // Si customerLabel = "" matchea casos con cliente IS NULL (pseudo
@@ -133,7 +181,7 @@ export async function listCasesByCustomer(
 
   const { data, error } = await query.returns<CaseRow[]>();
   if (error) throw error;
-  return data;
+  return mergeCaseShareCollaboratorUserIds(supabase, data ?? []);
 }
 
 // Legacy: lista por folder. Ya casi no se usa desde la UX customer-first
@@ -147,7 +195,7 @@ export async function listCases(supabase: SupabaseClient, folderId: string) {
     .returns<CaseRow[]>();
 
   if (error) throw error;
-  return data;
+  return mergeCaseShareCollaboratorUserIds(supabase, data ?? []);
 }
 
 export type CreateCaseInput = {
@@ -160,7 +208,6 @@ export type CreateCaseInput = {
   maquina?: string;
   prioridad?: CasePrioridad;
   conversionNivel?: CaseConversionNivel;
-  secondaryAgenteId?: string | null;
 };
 
 // Crea un caso asociado a un cliente. La UX customer-first invoca este
@@ -206,7 +253,7 @@ export async function createCase(
       estado: "abierto",
       prioridad: input.prioridad ?? "media",
       conversion_nivel: input.conversionNivel ?? "media",
-      secondary_agente_id: input.secondaryAgenteId ?? null,
+      secondary_agente_id: null,
     })
     .select(CASE_COLUMNS)
     .single<CaseRow>();

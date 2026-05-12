@@ -45,8 +45,8 @@ export type CaseFilters = {
   // case-sensitive en URL (ej. ?cliente=Magna,PCNC). Comparación contra
   // row.cliente es case-insensitive.
   clientes: string[];
-  // IDs (uuid) de agentes secundarios. Filtra casos donde
-  // cases.secondary_agente_id está en la lista. Vacío = no filtrar.
+  // IDs (uuid) de users que reciben el caso vía case_shares (destinatarios).
+  // Filtra si alguno está en la lista mergeada. Vacío = no filtrar.
   agentes: string[];
   fabricantes: BrandId[];
   rap: RapFilter;
@@ -253,8 +253,8 @@ export function applyFilters(
         return false;
     }
     if (agenteIdsSet.size > 0) {
-      if (!row.secondary_agente_id) return false;
-      if (!agenteIdsSet.has(row.secondary_agente_id)) return false;
+      const collab = row.collaborator_user_ids ?? [];
+      if (!collab.some((uid) => agenteIdsSet.has(uid))) return false;
     }
     if (
       filters.fabricantes.length &&

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/lib/workspace/context";
 import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import {
@@ -13,7 +14,9 @@ import {
   type CasePrioridad,
 } from "@/lib/cases/cases";
 import {
+  addInitialCaseShares,
   listShareableMembers,
+  type CaseSharePermission,
   type ShareableMember,
 } from "@/lib/cases/shares";
 import { formatError } from "@/lib/errors/format";
@@ -37,6 +40,7 @@ export function CaseForm({
   onCreated,
   onMessage,
 }: CaseFormProps) {
+  const { appUser } = useWorkspace();
   const [titulo, setTitulo] = useState("");
   const [operacionTipo, setOperacionTipo] = useState<CaseOperacionTipo | "">(
     "",
@@ -48,9 +52,11 @@ export function CaseForm({
   const [prioridad, setPrioridad] = useState<CasePrioridad>("media");
   const [conversionNivel, setConversionNivel] =
     useState<CaseConversionNivel>("media");
-  const [secondaryUserIds, setSecondaryUserIds] = useState<Set<string>>(
+  const [collaboratorUserIds, setCollaboratorUserIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [initialSharePermission, setInitialSharePermission] =
+    useState<CaseSharePermission>("edit");
   const [shareableMembers, setShareableMembers] = useState<ShareableMember[]>(
     [],
   );
@@ -78,7 +84,7 @@ export function CaseForm({
         if (!cancelled) setShareableMembers(list);
       } catch {
         // Silencioso: si falla, el selector queda vacío y se puede crear
-        // caso sin secundario.
+        // caso sin colaboradores iniciales.
       }
     })();
     return () => {
@@ -104,9 +110,41 @@ export function CaseForm({
         maquina: maquina.trim() || undefined,
         prioridad,
         conversionNivel,
-        secondaryUserIds:
-          secondaryUserIds.size > 0 ? Array.from(secondaryUserIds) : undefined,
       });
+      const toShare = shareableMembers.filter(
+        (m) =>
+          collaboratorUserIds.has(m.user_id) && m.user_id !== appUser.id,
+      );
+      if (toShare.length) {
+        try {
+          await addInitialCaseShares(
+            supabase,
+            row.id,
+            appUser.id,
+            toShare,
+            initialSharePermission,
+          );
+        } catch (shareErr) {
+          onMessage?.(
+            formatError(
+              shareErr,
+              "Caso creado, pero no se pudieron aplicar todos los compartidos iniciales.",
+            ),
+          );
+          onCreated(row);
+          setTitulo("");
+          setOperacionTipo("");
+          setOperacion("");
+          setMaterial("");
+          setMaquina("");
+          setMarca("");
+          setPrioridad("media");
+          setConversionNivel("media");
+          setCollaboratorUserIds(new Set());
+          setInitialSharePermission("edit");
+          return;
+        }
+      }
       onCreated(row);
       setTitulo("");
       setOperacionTipo("");
@@ -116,8 +154,13 @@ export function CaseForm({
       setMarca("");
       setPrioridad("media");
       setConversionNivel("media");
-      setSecondaryUserIds(new Set());
-      onMessage?.("Caso creado.");
+      setCollaboratorUserIds(new Set());
+      setInitialSharePermission("edit");
+      onMessage?.(
+        toShare.length
+          ? "Caso creado y compartido con los colaboradores seleccionados."
+          : "Caso creado.",
+      );
     } catch (error) {
       onMessage?.(
         formatError(error, "No se pudo crear el caso."),
@@ -220,11 +263,30 @@ export function CaseForm({
 
       <div className="grid gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-          Usuarios secundarios (opcional)
+          Colaboradores iniciales (opcional)
         </span>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Miembros del workspace con cuenta. Puedes marcar varios.
+          Se crean como compartidos del caso (igual que en el detalle). Puedes
+          cambiarlos después en Compartir.
         </p>
+        <label className="grid gap-1 text-sm">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Permiso para los seleccionados
+          </span>
+          <select
+            className={controlClass}
+            value={initialSharePermission}
+            onChange={(event) =>
+              setInitialSharePermission(
+                event.target.value as CaseSharePermission,
+              )
+            }
+            disabled={collaboratorUserIds.size === 0}
+          >
+            <option value="edit">Ver y editar</option>
+            <option value="view">Solo ver</option>
+          </select>
+        </label>
         <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-900/50">
           {shareableMembers.length === 0 ? (
             <p className="p-3 text-xs text-slate-500">Sin miembros para listar.</p>
@@ -237,9 +299,10 @@ export function CaseForm({
                 <input
                   type="checkbox"
                   className="rounded border-slate-300"
-                  checked={secondaryUserIds.has(m.user_id)}
+                  disabled={m.user_id === appUser.id}
+                  checked={collaboratorUserIds.has(m.user_id)}
                   onChange={() => {
-                    setSecondaryUserIds((prev) => {
+                    setCollaboratorUserIds((prev) => {
                       const n = new Set(prev);
                       if (n.has(m.user_id)) n.delete(m.user_id);
                       else n.add(m.user_id);
@@ -250,6 +313,9 @@ export function CaseForm({
                 <span className="text-slate-800 dark:text-slate-100">
                   {m.display_name}{" "}
                   <span className="text-slate-500">({m.email})</span>
+                  {m.user_id === appUser.id ? (
+                    <span className="text-xs text-slate-400"> — tú</span>
+                  ) : null}
                 </span>
               </label>
             ))
