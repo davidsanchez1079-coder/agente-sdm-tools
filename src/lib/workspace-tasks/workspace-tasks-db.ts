@@ -124,43 +124,46 @@ export type UpdateWorkspaceTaskPatch = Partial<{
   proximo_seguimiento_at: string | null;
 }>;
 
+function updateWorkspaceTaskPatchToJson(
+  patch: UpdateWorkspaceTaskPatch,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([, v]) => v !== undefined),
+  ) as Record<string, unknown>;
+}
+
 export async function updateWorkspaceTask(
   supabase: SupabaseClient,
   workspaceId: string,
   taskId: string,
   patch: UpdateWorkspaceTaskPatch,
 ): Promise<WorkspaceTaskRow> {
-  const { data, error } = await supabase
-    .from("workspace_tasks")
-    .update(patch)
-    .eq("workspace_id", workspaceId)
-    .eq("id", taskId)
-    .select(WORKSPACE_TASK_COLUMNS);
+  const { data, error } = await supabase.rpc("update_workspace_task_member", {
+    workspace_id_input: workspaceId,
+    task_id_input: taskId,
+    patch: updateWorkspaceTaskPatchToJson(patch),
+  });
   if (error) throw error;
-  const rows = data ?? [];
-  if (rows.length === 0) {
+  if (data == null || typeof data !== "object") {
     throw new Error(
       "No se pudo guardar la tarea: sin permiso o no se aplicó ningún cambio.",
     );
   }
-  if (rows.length > 1) {
-    throw new Error("Respuesta inesperada al actualizar la tarea.");
-  }
-  return rows[0] as WorkspaceTaskRow;
+  return data as unknown as WorkspaceTaskRow;
 }
 
-/** Sin `.select()`: evita RETURNING; útil si tras el cambio el actor ya no pasa la policy SELECT de la fila. */
+/** Sin lectura extra vía `.select()` en la tabla; el RPC devuelve la fila en JSON. */
 export async function updateWorkspaceTaskSilently(
   supabase: SupabaseClient,
   workspaceId: string,
   taskId: string,
   patch: UpdateWorkspaceTaskPatch,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("workspace_tasks")
-    .update(patch)
-    .eq("workspace_id", workspaceId)
-    .eq("id", taskId);
+  const { error } = await supabase.rpc("update_workspace_task_member", {
+    workspace_id_input: workspaceId,
+    task_id_input: taskId,
+    patch: updateWorkspaceTaskPatchToJson(patch),
+  });
   if (error) throw error;
 }
 
