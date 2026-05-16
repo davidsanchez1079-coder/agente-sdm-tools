@@ -7,6 +7,7 @@ export type NotificationDbRow = {
   title: string;
   body: string | null;
   href: string;
+  recipient_user_id: string;
   actor_user_id: string | null;
   entity_id: string;
   created_at: string;
@@ -57,7 +58,7 @@ export async function loadNotificationFromDb(
   const { data, error } = await admin
     .from("notifications")
     .select(
-      "id, kind, title, body, href, actor_user_id, entity_id, created_at, data",
+      "id, kind, title, body, href, recipient_user_id, actor_user_id, entity_id, created_at, data",
     )
     .eq("id", notificationId)
     .maybeSingle<NotificationDbRow>();

@@ -24,6 +24,7 @@ type NotificationRow = {
   title: string;
   body: string | null;
   href: string;
+  recipient_user_id: string;
   actor_user_id: string | null;
   entity_id: string;
   created_at: string;
@@ -48,11 +49,35 @@ function toBuildRow(row: NotificationDbRow): NotificationRow {
     title: row.title,
     body: row.body,
     href: row.href,
+    recipient_user_id: row.recipient_user_id,
     actor_user_id: row.actor_user_id,
     entity_id: row.entity_id,
     created_at: row.created_at,
     data: normalizeNotificationData(row.data),
   };
+}
+
+async function loadTaskAssigneeUserId(
+  admin: SupabaseClient,
+  taskId: string,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .from("workspace_tasks")
+    .select("assigned_to_user_id")
+    .eq("id", taskId)
+    .maybeSingle<{ assigned_to_user_id: string | null }>();
+  if (error) throw error;
+  return data?.assigned_to_user_id ?? null;
+}
+
+function resolveAssigneeDisplay(
+  assigneeUserId: string | null,
+  recipientUserId: string,
+  usersById: Map<string, UserRow>,
+): string {
+  if (!assigneeUserId) return "Sin responsable";
+  if (assigneeUserId === recipientUserId) return "Tú";
+  return formatUserLabel(usersById.get(assigneeUserId)) ?? "Usuario";
 }
 
 async function loadUsersByIds(
@@ -145,8 +170,11 @@ export async function buildTaskNotificationEmailInput(
     asNotificationString(record.body) ??
     "Tarea";
 
+  const taskAssigneeId = await loadTaskAssigneeUserId(admin, record.entity_id);
+
   const userIds: string[] = [];
   if (record.actor_user_id) userIds.push(record.actor_user_id);
+  if (taskAssigneeId) userIds.push(taskAssigneeId);
   const oldAssignee = asNotificationString(data.old_assignee_user_id);
   const newAssignee = asNotificationString(data.new_assignee_user_id);
   const assignedOnCreate = asNotificationString(data.assigned_to_user_id);
@@ -155,6 +183,11 @@ export async function buildTaskNotificationEmailInput(
   if (assignedOnCreate) userIds.push(assignedOnCreate);
 
   const usersById = await loadUsersByIds(admin, userIds);
+  const assigneeDisplay = resolveAssigneeDisplay(
+    taskAssigneeId,
+    record.recipient_user_id,
+    usersById,
+  );
   const actorLabel = formatUserLabel(
     record.actor_user_id ? usersById.get(record.actor_user_id) : undefined,
   );
@@ -224,6 +257,7 @@ export async function buildTaskNotificationEmailInput(
     actionUrl: "",
     taskTitle,
     headline,
+    assigneeDisplay,
     actorLabel,
     occurredAt: commentAt ?? record.created_at,
     commentText,

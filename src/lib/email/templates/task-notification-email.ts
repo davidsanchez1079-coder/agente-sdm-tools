@@ -12,6 +12,8 @@ export type TaskNotificationEmailInput = {
   actionUrl: string;
   taskTitle: string;
   headline: string;
+  /** "Tú", nombre del responsable o "Sin responsable". */
+  assigneeDisplay: string;
   actorLabel: string | null;
   occurredAt: string;
   commentText: string | null;
@@ -105,6 +107,17 @@ function renderChangesHtml(changes: TaskNotificationChange[]): string {
   </table>`;
 }
 
+function renderAssigneeHtml(display: string): string {
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0 0;border-collapse:collapse;">
+    <tr><td style="padding:0 0 8px 0;">
+      <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Responsable</p>
+    </td></tr>
+    <tr><td style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;">
+      <p style="margin:0;font-size:15px;line-height:1.45;color:#0f172a;font-weight:600;">${escapeHtml(display)}</p>
+    </td></tr>
+  </table>`;
+}
+
 function renderCommentHtml(text: string): string {
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0 0;border-collapse:collapse;">
     <tr><td style="padding:0 0 8px 0;">
@@ -134,8 +147,15 @@ export function renderTaskNotificationEmailHtml(
       ? sanitizeNotificationEmailCopy(input.commentText).replace(/\s+/g, " ").slice(0, 140)
       : headline;
 
-  const metaTable = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0 0;border-collapse:collapse;">
+  const assigneeDisplay = sanitizeNotificationEmailCopy(input.assigneeDisplay) || "Sin responsable";
+
+  const taskMetaTable = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0 0;border-collapse:collapse;">
     ${metaRow("Tarea", taskTitle)}
+  </table>`;
+
+  const assigneeBlock = renderAssigneeHtml(assigneeDisplay);
+
+  const contextMetaTable = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0 0;border-collapse:collapse;">
     ${actor ? metaRow("Autor", actor) : ""}
     ${metaRow("Fecha", when)}
   </table>`;
@@ -158,7 +178,9 @@ export function renderTaskNotificationEmailHtml(
         <tr><td>
           <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#0f766e;">GOTIA · Tareas</p>
           <h1 style="margin:12px 0 0;font-size:20px;line-height:1.35;color:#0f172a;font-weight:700;">${escapeHtml(headline)}</h1>
-          ${metaTable}
+          ${taskMetaTable}
+          ${assigneeBlock}
+          ${contextMetaTable}
           ${commentBlock}
           ${changesBlock}
           <p style="margin:28px 0 0;text-align:center;">
@@ -185,6 +207,7 @@ export function renderTaskNotificationEmailText(
     input.headline,
     "",
     `Tarea: ${sanitizeNotificationEmailCopy(input.taskTitle) || "Tarea"}`,
+    `Responsable: ${sanitizeNotificationEmailCopy(input.assigneeDisplay) || "Sin responsable"}`,
   ];
   if (input.actorLabel) {
     lines.push(`Autor: ${sanitizeNotificationEmailCopy(input.actorLabel)}`);
