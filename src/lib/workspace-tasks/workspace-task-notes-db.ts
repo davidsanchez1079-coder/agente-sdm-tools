@@ -46,8 +46,8 @@ export async function listWorkspaceTaskNotes(
     .select(NOTE_COLUMNS)
     .eq("workspace_id", workspaceId)
     .eq("workspace_task_id", taskId)
-    .order("created_at", { ascending: true })
-    .order("id", { ascending: true })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .returns<WorkspaceTaskNoteRow[]>();
   if (error) throw error;
   return data ?? [];

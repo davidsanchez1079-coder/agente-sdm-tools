@@ -48,6 +48,7 @@ import {
 import { ModuleIcon } from "@/components/ui/module-icon";
 import { formatError } from "@/lib/errors/format";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { TaskNoteBody } from "@/components/workspace-tasks/task-note-body";
 
 const ROL_SHORT: Record<WorkspaceMemberRow["rol"], string> = {
   gerente: "Gerente",
@@ -77,8 +78,6 @@ function addMsToNow(ms: number): string {
 
 type TaskScope = "interna" | "cliente";
 
-type ReassignDuePreset = "keep" | "now" | "1h" | "3h" | "1d" | "1w";
-
 export default function TareaDetallePage() {
   const params = useParams();
   const router = useRouter();
@@ -98,9 +97,9 @@ export default function TareaDetallePage() {
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>(
     {},
   );
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerDueLocal, setComposerDueLocal] = useState("");
   const [reassignToUserId, setReassignToUserId] = useState<string>("");
-  const [reassignDuePreset, setReassignDuePreset] =
-    useState<ReassignDuePreset>("keep");
   const [reassigning, setReassigning] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [internalLoading, setInternalLoading] = useState(true);
@@ -129,6 +128,7 @@ export default function TareaDetallePage() {
 
   const loading = !isExterno && internalLoading;
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const noteComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -181,6 +181,7 @@ export default function TareaDetallePage() {
         setPrioridad(row.prioridad);
         setAssignedToUserId(row.assigned_to_user_id ?? "");
         setReassignToUserId(row.assigned_to_user_id ?? "");
+        setComposerDueLocal(toDatetimeLocalValue(row.vence_el));
         setVenceElLocal(toDatetimeLocalValue(row.vence_el));
         setProximoSeguimiento(row.proximo_seguimiento ?? "");
         setProximoSeguimientoAtLocal(
@@ -203,11 +204,40 @@ export default function TareaDetallePage() {
     };
   }, [workspaceId, taskId, isExterno]);
 
-  async function handlePostNote() {
+  function resetComposerFields() {
+    if (!task) return;
+    setNoteBody("");
+    setReassignToUserId(task.assigned_to_user_id ?? "");
+    setComposerDueLocal(toDatetimeLocalValue(task.vence_el));
+  }
+
+  function openComposer() {
+    if (!task) return;
+    setNoteBody("");
+    setReassignToUserId(task.assigned_to_user_id ?? "");
+    setComposerDueLocal(toDatetimeLocalValue(task.vence_el));
+    setComposerOpen(true);
+  }
+
+  function cancelComposer() {
+    setComposerOpen(false);
+    resetComposerFields();
+  }
+
+  useEffect(() => {
+    if (!composerOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      noteComposerRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [composerOpen]);
+
+  async function handlePublishComposer() {
     if (!taskId || !taskReady || !task) return;
     const trimmed = noteBody.trim();
     if (!trimmed) return;
     setPostingNote(true);
+    setReassigning(true);
     setMessage(null);
     try {
       const supabase = getSupabaseBrowserClient();
@@ -217,58 +247,52 @@ export default function TareaDetallePage() {
         taskId,
         trimmed,
       );
-      setNotes((prev) => [...prev, created]);
-      setNoteBody("");
+      setNotes((prev) => [created, ...prev]);
+
+      const nextDue = fromDatetimeLocalValue(composerDueLocal);
+      const prevDue = task.vence_el ?? null;
+      const dueChanged = nextDue !== prevDue;
+      const nextAssignee = reassignToUserId || null;
+      const assigneeChanged =
+        nextAssignee !== (task.assigned_to_user_id ?? null);
+
+      if (dueChanged || assigneeChanged) {
+        const patch: {
+          assigned_to_user_id?: string | null;
+          vence_el?: string | null;
+        } = {};
+        if (assigneeChanged) patch.assigned_to_user_id = nextAssignee;
+        if (dueChanged) patch.vence_el = nextDue;
+        await updateWorkspaceTaskSilently(
+          supabase,
+          workspaceId,
+          taskId,
+          patch,
+        );
+        setTask((prev) =>
+          prev
+            ? {
+                ...prev,
+                assigned_to_user_id: assigneeChanged
+                  ? nextAssignee
+                  : prev.assigned_to_user_id,
+                vence_el: dueChanged ? nextDue : prev.vence_el,
+              }
+            : prev,
+        );
+        setAssignedToUserId(nextAssignee ?? "");
+        setVenceElLocal(
+          toDatetimeLocalValue(dueChanged ? nextDue : task.vence_el),
+        );
+      }
+
+      setComposerOpen(false);
+      resetComposerFields();
+      setMessage("Comentario publicado.");
     } catch (error) {
-      setMessage(formatError(error, "No se pudo guardar la nota."));
+      setMessage(formatError(error, "No se pudo publicar el comentario."));
     } finally {
       setPostingNote(false);
-    }
-  }
-
-  async function handleConfirmReassign() {
-    if (!taskId || !task) return;
-    setReassigning(true);
-    setMessage(null);
-    try {
-      const dueIsoByPreset: Record<
-        Exclude<ReassignDuePreset, "keep">,
-        string
-      > = {
-        now: new Date().toISOString(),
-        "1h": new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
-        "3h": new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-        "1d": new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        "1w": new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      };
-      const venceEl =
-        reassignDuePreset === "keep"
-          ? undefined
-          : dueIsoByPreset[reassignDuePreset];
-
-      const supabase = getSupabaseBrowserClient();
-      const patch = {
-        assigned_to_user_id: reassignToUserId ? reassignToUserId : null,
-        ...(venceEl ? { vence_el: venceEl } : {}),
-      };
-      await updateWorkspaceTaskSilently(supabase, workspaceId, taskId, patch);
-      const nextAssigned = patch.assigned_to_user_id ?? null;
-      setTask((prev) =>
-        prev
-          ? {
-              ...prev,
-              assigned_to_user_id: nextAssigned,
-              vence_el: venceEl !== undefined ? venceEl : prev.vence_el,
-            }
-          : prev,
-      );
-      setAssignedToUserId(nextAssigned ?? "");
-      setReassignToUserId(nextAssigned ?? "");
-      setReassignDuePreset("keep");
-      setMessage("Responsable actualizado.");
-    } catch (error) {
-      setMessage(formatError(error, "No se pudo reasignar la tarea."));
-    } finally {
       setReassigning(false);
     }
   }
@@ -396,8 +420,7 @@ export default function TareaDetallePage() {
     "w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:focus:border-sky-400 dark:focus:ring-sky-400/20";
 
   const threadMaxHeightClass = useMemo(() => {
-    // ~3 mensajes visibles, el resto con scroll.
-    return "max-h-[360px] sm:max-h-[420px]";
+    return "max-h-[min(70vh,640px)]";
   }, []);
 
   const venceElDirty = useMemo(() => {
@@ -410,7 +433,7 @@ export default function TareaDetallePage() {
   useEffect(() => {
     const el = threadRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    el.scrollTop = 0;
   }, [taskId, notes.length]);
 
   useEffect(() => {
@@ -477,8 +500,9 @@ export default function TareaDetallePage() {
           attachment_size_bytes: uploaded.sizeBytes,
         },
       );
-      setNotes((prev) => [...prev, created]);
-      setNoteBody("");
+      setNotes((prev) => [created, ...prev]);
+      setComposerOpen(false);
+      resetComposerFields();
       setMessage(`${kind === "foto" ? "Foto" : "Archivo"} guardado en el hilo.`);
     } catch (error) {
       if (uploaded) {
@@ -616,58 +640,264 @@ export default function TareaDetallePage() {
                 Hilo de la tarea
               </h3>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                Notas cronológicas para registrar avances, acuerdos o
-                instrucciones. Sin realtime en esta versión.
+                Notas para registrar avances, acuerdos o instrucciones. La más
+                reciente aparece arriba. Los enlaces son clicables.
               </p>
             </header>
 
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40">
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out motion-reduce:transition-none ${
+                  composerOpen
+                    ? "grid-rows-[0fr] opacity-0"
+                    : "grid-rows-[1fr] opacity-100"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={openComposer}
+                    disabled={postingNote || uploadingAttachment}
+                    className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                  >
+                    <span
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500 text-[15px] font-semibold leading-none text-white dark:bg-sky-400 dark:text-slate-950"
+                      aria-hidden
+                    >
+                      +
+                    </span>
+                    Nuevo comentario
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out motion-reduce:transition-none ${
+                  composerOpen
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div
+                    className={`grid gap-4 p-4 ${composerOpen ? "border-t border-slate-100 dark:border-slate-800/80" : ""}`}
+                  >
+                    <label className="grid gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                        Comentario
+                      </span>
+                      <textarea
+                        ref={noteComposerRef}
+                        className={`${noteControlClass} min-h-[96px] resize-y`}
+                        value={noteBody}
+                        onChange={(e) => setNoteBody(e.target.value)}
+                        placeholder="Escribe un avance, acuerdo o instrucción…"
+                        disabled={postingNote || uploadingAttachment}
+                      />
+                    </label>
+                    {noteBody.trim() ? (
+                      <div
+                        className="min-w-0 overflow-hidden rounded-xl border border-dashed border-slate-200 bg-slate-50/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/50"
+                        aria-live="polite"
+                      >
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                          Vista previa
+                        </p>
+                        <TaskNoteBody text={noteBody} />
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1.5 text-sm">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                          Nueva fecha de vencimiento
+                        </span>
+                        <input
+                          type="datetime-local"
+                          className={controlClass}
+                          value={composerDueLocal}
+                          onChange={(e) => setComposerDueLocal(e.target.value)}
+                          disabled={postingNote || reassigning}
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+                          Nuevo responsable
+                        </span>
+                        <select
+                          className={controlClass}
+                          value={reassignToUserId}
+                          onChange={(e) => setReassignToUserId(e.target.value)}
+                          disabled={postingNote || reassigning}
+                        >
+                          <option value="">Sin responsable</option>
+                          {task.created_by_user_id ? (
+                            <option value={task.created_by_user_id}>
+                              Creador ·{" "}
+                              {task.created_by_user_id === appUser.id
+                                ? "Tú"
+                                : membersByUserId.get(task.created_by_user_id)
+                                    ?.email ?? "Usuario"}
+                            </option>
+                          ) : null}
+                          {assignable.map((m) =>
+                            m.user_id && m.user_id !== task.created_by_user_id ? (
+                              <option key={m.id} value={m.user_id}>
+                                {m.email} · {ROL_SHORT[m.rol]}
+                              </option>
+                            ) : null,
+                          )}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800/80">
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.currentTarget.files?.item(0) ?? null;
+                          e.currentTarget.value = "";
+                          void handlePickedFile("foto", file);
+                        }}
+                      />
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.currentTarget.files?.item(0) ?? null;
+                          e.currentTarget.value = "";
+                          void handlePickedFile("foto", file);
+                        }}
+                      />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.currentTarget.files?.item(0) ?? null;
+                          e.currentTarget.value = "";
+                          void handlePickedFile("archivo", file);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={uploadingAttachment}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                      >
+                        {uploadingAttachment ? "Guardando…" : "Foto"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={uploadingAttachment}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                      >
+                        Galería
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingAttachment}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                      >
+                        Archivo
+                      </button>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Adjuntos hasta 20 MB
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handlePublishComposer()}
+                        disabled={
+                          postingNote ||
+                          uploadingAttachment ||
+                          !noteBody.trim()
+                        }
+                        className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
+                      >
+                        {postingNote ? "Publicando…" : "Publicar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelComposer}
+                        disabled={postingNote || uploadingAttachment}
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {notes.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-sm leading-6 text-slate-600 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300">
-                Aún no hay notas. Escribe la primera para empezar el hilo.
+                Aún no hay comentarios. Usa «Nuevo comentario» para publicar el
+                primero.
               </div>
             ) : (
               <div
                 ref={threadRef}
-                className={`rounded-2xl border border-slate-200 bg-white/60 p-3 shadow-sm ${threadMaxHeightClass} overflow-y-auto dark:border-slate-800/80 dark:bg-slate-900/30 dark:shadow-none`}
+                className={`rounded-2xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm ${threadMaxHeightClass} overflow-y-auto scroll-smooth dark:border-slate-800/80 dark:bg-slate-950/40 dark:shadow-none`}
               >
-                <ul className="grid gap-3">
+                <ul className="grid gap-4">
                   {notes.map((n) => {
                     const isMine = n.created_by_user_id === appUser.id;
                     const author = membersByUserId.get(n.created_by_user_id);
                     const authorLabel = isMine
                       ? "Tú"
                       : author?.email ?? "Usuario";
+                    const createdAt = new Date(n.created_at);
+                    const dateLabel = createdAt.toLocaleDateString(undefined, {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    });
+                    const timeLabel = createdAt.toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
                     const attachmentUrl = n.attachment_storage_path
                       ? attachmentUrls[n.attachment_storage_path]
                       : null;
                     const isImage =
                       n.attachment_mime_type?.startsWith("image/") ?? false;
                     return (
-                      <li
-                        key={n.id}
-                        className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[46rem] rounded-2xl border px-4 py-3 shadow-sm ${
+                      <li key={n.id} className="min-w-0">
+                        <article
+                          className={`min-w-0 overflow-hidden rounded-2xl border px-4 py-3.5 shadow-sm ${
                             isMine
-                              ? "border-sky-200 bg-sky-50 text-slate-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-slate-100"
-                              : "border-slate-200 bg-white text-slate-900 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-100"
+                              ? "border-sky-200/90 bg-white dark:border-sky-500/25 dark:bg-slate-900/70"
+                              : "border-slate-200 bg-white dark:border-slate-700/80 dark:bg-slate-900/50"
                           }`}
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-slate-100 pb-2.5 dark:border-slate-800/80">
+                            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                               {authorLabel}
                             </span>
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                              {new Date(n.created_at).toLocaleString(undefined, {
-                                dateStyle: "short",
-                                timeStyle: "short",
-                              })}
-                            </span>
+                            <time
+                              className="text-xs tabular-nums text-slate-500 dark:text-slate-400"
+                              dateTime={n.created_at}
+                              title={createdAt.toLocaleString()}
+                            >
+                              {dateLabel} · {timeLabel}
+                            </time>
+                          </header>
+                          <div className="mt-3 min-w-0">
+                            <TaskNoteBody text={n.body} />
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800 dark:text-slate-100">
-                            {n.body}
-                          </p>
                           {n.attachment_storage_path ? (
                             <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-950/40">
                               {attachmentUrl && isImage ? (
@@ -679,7 +909,10 @@ export default function TareaDetallePage() {
                                 />
                               ) : null}
                               <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
-                                <span className="font-medium text-slate-700 dark:text-slate-200">
+                                <span
+                                  className="min-w-0 max-w-full truncate font-medium text-slate-700 dark:text-slate-200"
+                                  title={n.attachment_filename ?? "Adjunto"}
+                                >
                                   {n.attachment_filename ?? "Adjunto"}
                                 </span>
                                 {attachmentUrl ? (
@@ -699,7 +932,7 @@ export default function TareaDetallePage() {
                               </div>
                             </div>
                           ) : null}
-                        </div>
+                        </article>
                       </li>
                     );
                   })}
@@ -710,222 +943,72 @@ export default function TareaDetallePage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800/80 dark:bg-slate-900/40 dark:shadow-none">
               <label className="grid gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                  Nueva nota
+                  Copia para (opcional)
                 </span>
-                <textarea
-                  className={`${noteControlClass} min-h-[96px] resize-y`}
-                  value={noteBody}
-                  onChange={(e) => setNoteBody(e.target.value)}
-                  placeholder="Escribe un avance, acuerdo o instrucción…"
-                  disabled={postingNote || uploadingAttachment}
-                />
-              </label>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.currentTarget.files?.item(0) ?? null;
-                    e.currentTarget.value = "";
-                    void handlePickedFile("foto", file);
-                  }}
-                />
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.currentTarget.files?.item(0) ?? null;
-                    e.currentTarget.value = "";
-                    void handlePickedFile("foto", file);
-                  }}
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.currentTarget.files?.item(0) ?? null;
-                    e.currentTarget.value = "";
-                    void handlePickedFile("archivo", file);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  disabled={uploadingAttachment}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                >
-                  {uploadingAttachment ? "Guardando…" : "Tomar foto"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={uploadingAttachment}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                >
-                  Subir foto
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingAttachment}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200"
-                >
-                  Subir archivo
-                </button>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Adjuntos hasta 20 MB; las fotos quedan en el hilo.
-                </span>
-              </div>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-sm sm:col-span-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                    Reasignar (opcional)
-                  </span>
+                {!copiesEnabled ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Activa la migración{" "}
+                    <span className="font-semibold">workspace_task_copies</span>{" "}
+                    para usar esta función.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
                   <select
                     className={controlClass}
-                    value={reassignToUserId}
-                    onChange={(e) => setReassignToUserId(e.target.value)}
-                    disabled={reassigning}
+                    value={copyToUserId}
+                    onChange={(e) => setCopyToUserId(e.target.value)}
+                    disabled={copyBusy || !copiesEnabled}
                   >
-                    <option value="">Sin responsable</option>
-                    {task.created_by_user_id ? (
-                      <option value={task.created_by_user_id}>
-                        Creador ·{" "}
-                        {task.created_by_user_id === appUser.id
-                          ? "Tú"
-                          : membersByUserId.get(task.created_by_user_id)
-                              ?.email ?? "Usuario"}
-                      </option>
-                    ) : null}
+                    <option value="">Selecciona un miembro…</option>
                     {assignable.map((m) =>
-                      m.user_id && m.user_id !== task.created_by_user_id ? (
+                      m.user_id ? (
                         <option key={m.id} value={m.user_id}>
                           {m.email} · {ROL_SHORT[m.rol]}
                         </option>
                       ) : null,
                     )}
                   </select>
-                </label>
-
-                <label className="grid gap-1.5 text-sm sm:col-span-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                    Copia para (opcional)
-                  </span>
-                  {!copiesEnabled ? (
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      (Opcional) Activa “Copia para” corriendo la migración de
-                      <span className="font-semibold"> workspace_task_copies</span>.
-                    </p>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    <select
-                      className={controlClass}
-                      value={copyToUserId}
-                      onChange={(e) => setCopyToUserId(e.target.value)}
-                      disabled={copyBusy || !copiesEnabled}
-                    >
-                      <option value="">Selecciona un miembro…</option>
-                      {assignable.map((m) =>
-                        m.user_id ? (
-                          <option key={m.id} value={m.user_id}>
-                            {m.email} · {ROL_SHORT[m.rol]}
-                          </option>
-                        ) : null,
-                      )}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void handleAddCopy()}
-                      disabled={!copyToUserId || copyBusy || !copiesEnabled}
-                      className="rounded-xl border border-emerald-500/40 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-slate-900/60 dark:text-emerald-200 dark:hover:bg-emerald-400/10"
-                    >
-                      {copyBusy ? "Aplicando…" : "Agregar copia"}
-                    </button>
-                  </div>
-                  {copies.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {copies.map((c) => {
-                        const email =
-                          membersByUserId.get(c.copied_user_id)?.email ?? "Usuario";
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => void handleRemoveCopy(c.copied_user_id)}
-                            disabled={copyBusy}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/10"
-                            title="Quitar copia"
-                          >
-                            {email}
-                            <span aria-hidden className="text-[12px] text-slate-500 dark:text-slate-400">
-                              ×
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      Los usuarios en “copia” reciben avisos cuando hay notas nuevas.
-                    </p>
-                  )}
-                </label>
-
-                <label className="grid gap-1.5 text-sm">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                    Vencimiento (opcional)
-                  </span>
-                  <select
-                    className={controlClass}
-                    value={reassignDuePreset}
-                    onChange={(e) =>
-                      setReassignDuePreset(e.target.value as ReassignDuePreset)
-                    }
-                    disabled={reassigning}
+                  <button
+                    type="button"
+                    onClick={() => void handleAddCopy()}
+                    disabled={!copyToUserId || copyBusy || !copiesEnabled}
+                    className="rounded-xl border border-emerald-500/40 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/30 dark:bg-slate-900/60 dark:text-emerald-200 dark:hover:bg-emerald-400/10"
                   >
-                    <option value="keep">Sin cambio</option>
-                    <option value="now">La primera opción (vence ahora)</option>
-                    <option value="1h">1 hora</option>
-                    <option value="3h">3 horas</option>
-                    <option value="1d">1 día</option>
-                    <option value="1w">1 semana</option>
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => void handlePostNote()}
-                  disabled={postingNote || uploadingAttachment || !noteBody.trim()}
-                  className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300"
-                >
-                  {postingNote ? "Enviando…" : "Agregar nota"}
-                </button>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmReassign()}
-                  disabled={
-                    reassigning ||
-                    ((task.assigned_to_user_id ?? "") === reassignToUserId &&
-                      reassignDuePreset === "keep")
-                  }
-                  className="rounded-xl border border-sky-500/40 bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-sky-400/30 dark:bg-slate-900/60 dark:text-sky-200 dark:hover:bg-sky-400/10"
-                >
-                  {reassigning ? "Aplicando…" : "Aplicar responsable/vencimiento"}
-                </button>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Puedes cambiar solo el vencimiento aunque no reasignes ni escribas nota.
-                </span>
-              </div>
+                    {copyBusy ? "Aplicando…" : "Agregar copia"}
+                  </button>
+                </div>
+                {copies.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {copies.map((c) => {
+                      const email =
+                        membersByUserId.get(c.copied_user_id)?.email ?? "Usuario";
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => void handleRemoveCopy(c.copied_user_id)}
+                          disabled={copyBusy}
+                          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-800/80 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/10"
+                          title="Quitar copia"
+                        >
+                          {email}
+                          <span
+                            aria-hidden
+                            className="text-[12px] text-slate-500 dark:text-slate-400"
+                          >
+                            ×
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Los usuarios en copia reciben avisos cuando hay comentarios
+                    nuevos.
+                  </p>
+                )}
+              </label>
             </div>
 
             <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/60 p-4 dark:border-rose-500/30 dark:bg-rose-500/10">
