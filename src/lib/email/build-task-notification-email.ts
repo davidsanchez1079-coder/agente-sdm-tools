@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NotificationKind } from "@/lib/notifications/types";
 import {
+  asNotificationString,
+  normalizeNotificationData,
+  type NotificationDbRow,
+} from "@/lib/email/notification-record";
+import {
   formatNotificationDateTime,
   type TaskNotificationChange,
   type TaskNotificationEmailInput,
@@ -20,15 +25,10 @@ type NotificationRow = {
   body: string | null;
   href: string;
   actor_user_id: string | null;
+  entity_id: string;
   created_at: string;
   data: Record<string, unknown>;
 };
-
-function asString(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const t = value.trim();
-  return t.length > 0 ? t : null;
-}
 
 function formatUserLabel(user: UserRow | null | undefined): string | null {
   if (!user) return null;
@@ -39,6 +39,20 @@ function formatUserLabel(user: UserRow | null | undefined): string | null {
 function formatDueLabel(iso: string | null): string {
   if (!iso) return "Sin fecha";
   return formatNotificationDateTime(iso);
+}
+
+function toBuildRow(row: NotificationDbRow): NotificationRow {
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    href: row.href,
+    actor_user_id: row.actor_user_id,
+    entity_id: row.entity_id,
+    created_at: row.created_at,
+    data: normalizeNotificationData(row.data),
+  };
 }
 
 async function loadUsersByIds(
@@ -58,7 +72,7 @@ async function loadUsersByIds(
   return new Map((data ?? []).map((u) => [u.id, u]));
 }
 
-async function loadNoteBody(
+async function loadNoteById(
   admin: SupabaseClient,
   noteId: string,
 ): Promise<{ body: string; created_at: string } | null> {
@@ -67,8 +81,58 @@ async function loadNoteBody(
     .select("body, created_at")
     .eq("id", noteId)
     .maybeSingle<{ body: string; created_at: string }>();
-  if (error) throw error;
+  if (error) {
+    console.error("[notification-email] note by id", error);
+    return null;
+  }
   return data;
+}
+
+async function loadLatestNoteForTask(
+  admin: SupabaseClient,
+  taskId: string,
+): Promise<{ body: string; created_at: string } | null> {
+  const { data, error } = await admin
+    .from("workspace_task_notes")
+    .select("body, created_at")
+    .eq("workspace_task_id", taskId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ body: string; created_at: string }>();
+  if (error) {
+    console.error("[notification-email] latest note for task", error);
+    return null;
+  }
+  return data;
+}
+
+async function resolveCommentForNoteNotification(
+  admin: SupabaseClient,
+  record: NotificationRow,
+  data: Record<string, unknown>,
+): Promise<{ text: string | null; at: string | null }> {
+  let text = asNotificationString(data.note_text);
+  let at = asNotificationString(data.note_created_at);
+
+  const noteId = asNotificationString(data.note_id);
+
+  if (!text && noteId) {
+    const note = await loadNoteById(admin, noteId);
+    if (note?.body?.trim()) {
+      text = note.body.trim();
+      at = note.created_at;
+    }
+  }
+
+  if (!text) {
+    const note = await loadLatestNoteForTask(admin, record.entity_id);
+    if (note?.body?.trim()) {
+      text = note.body.trim();
+      at = note.created_at;
+    }
+  }
+
+  return { text, at };
 }
 
 export async function buildTaskNotificationEmailInput(
@@ -77,13 +141,15 @@ export async function buildTaskNotificationEmailInput(
 ): Promise<TaskNotificationEmailInput> {
   const data = record.data ?? {};
   const taskTitle =
-    asString(data.task_titulo) ?? asString(record.body) ?? "Tarea";
+    asNotificationString(data.task_titulo) ??
+    asNotificationString(record.body) ??
+    "Tarea";
 
   const userIds: string[] = [];
   if (record.actor_user_id) userIds.push(record.actor_user_id);
-  const oldAssignee = asString(data.old_assignee_user_id);
-  const newAssignee = asString(data.new_assignee_user_id);
-  const assignedOnCreate = asString(data.assigned_to_user_id);
+  const oldAssignee = asNotificationString(data.old_assignee_user_id);
+  const newAssignee = asNotificationString(data.new_assignee_user_id);
+  const assignedOnCreate = asNotificationString(data.assigned_to_user_id);
   if (oldAssignee) userIds.push(oldAssignee);
   if (newAssignee) userIds.push(newAssignee);
   if (assignedOnCreate) userIds.push(assignedOnCreate);
@@ -93,23 +159,24 @@ export async function buildTaskNotificationEmailInput(
     record.actor_user_id ? usersById.get(record.actor_user_id) : undefined,
   );
 
-  let commentText: string | null = asString(data.note_text);
-  let commentAt: string | null = asString(data.note_created_at);
+  let commentText: string | null = null;
+  let commentAt: string | null = null;
 
-  const noteId = asString(data.note_id);
-  if (record.kind === "task_note_added" && !commentText && noteId) {
-    const note = await loadNoteBody(admin, noteId);
-    if (note) {
-      commentText = note.body;
-      commentAt = note.created_at;
-    }
+  if (record.kind === "task_note_added") {
+    const resolved = await resolveCommentForNoteNotification(
+      admin,
+      record,
+      data,
+    );
+    commentText = resolved.text;
+    commentAt = resolved.at;
   }
 
   const changes: TaskNotificationChange[] = [];
 
   if (record.kind === "task_due_changed") {
-    const oldDue = asString(data.old_vence_el);
-    const newDue = asString(data.new_vence_el);
+    const oldDue = asNotificationString(data.old_vence_el);
+    const newDue = asNotificationString(data.new_vence_el);
     changes.push({
       label: "Vencimiento",
       before: formatDueLabel(oldDue),
@@ -163,4 +230,12 @@ export async function buildTaskNotificationEmailInput(
     commentAt,
     changes,
   };
+}
+
+/** Fila canónica desde BD (fuente de verdad para `data` y `entity_id`). */
+export async function buildTaskNotificationEmailInputFromDb(
+  admin: SupabaseClient,
+  dbRow: NotificationDbRow,
+): Promise<TaskNotificationEmailInput> {
+  return buildTaskNotificationEmailInput(admin, toBuildRow(dbRow));
 }

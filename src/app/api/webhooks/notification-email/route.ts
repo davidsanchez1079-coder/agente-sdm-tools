@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import { buildTaskNotificationEmailInput } from "@/lib/email/build-task-notification-email";
+import { buildTaskNotificationEmailInputFromDb } from "@/lib/email/build-task-notification-email";
+import { loadNotificationFromDb } from "@/lib/email/notification-record";
 import {
   renderNotificationInAppEmailHtml,
   renderNotificationInAppEmailText,
@@ -149,16 +150,12 @@ export async function POST(request: NextRequest) {
   let text: string;
 
   if (isTaskKind(record.kind)) {
-    const emailInput = await buildTaskNotificationEmailInput(admin, {
-      id: record.id,
-      kind: record.kind,
-      title: record.title,
-      body: record.body ?? null,
-      href: record.href,
-      actor_user_id: record.actor_user_id ?? null,
-      created_at: record.created_at ?? new Date().toISOString(),
-      data: record.data ?? {},
-    });
+    const dbRow = await loadNotificationFromDb(admin, record.id);
+    if (!dbRow) {
+      return jsonError("Notificación no encontrada en base de datos.", 404);
+    }
+
+    const emailInput = await buildTaskNotificationEmailInputFromDb(admin, dbRow);
     emailInput.actionUrl = actionUrl;
     subject = taskNotificationEmailSubject(emailInput);
     html = renderTaskNotificationEmailHtml(emailInput);
