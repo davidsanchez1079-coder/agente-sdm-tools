@@ -113,6 +113,64 @@ async function loadNoteById(
   return data;
 }
 
+const INITIAL_MESSAGE_WINDOW_MS = 60_000;
+/** Espera breve si el webhook de tarea corre antes del INSERT de la nota en el cliente. */
+const INITIAL_MESSAGE_RETRY_DELAYS_MS = [0, 1500, 3000] as const;
+
+async function loadFirstMessageNoteForTask(
+  admin: SupabaseClient,
+  taskId: string,
+): Promise<{ body: string; created_at: string } | null> {
+  const { data: task, error: taskErr } = await admin
+    .from("workspace_tasks")
+    .select("created_at")
+    .eq("id", taskId)
+    .maybeSingle<{ created_at: string }>();
+  if (taskErr) {
+    console.error("[notification-email] task created_at", taskErr);
+    return null;
+  }
+  if (!task?.created_at) return null;
+
+  const windowStart = new Date(task.created_at).getTime();
+  const windowEnd = windowStart + INITIAL_MESSAGE_WINDOW_MS;
+
+  const { data: notes, error } = await admin
+    .from("workspace_task_notes")
+    .select("body, created_at")
+    .eq("workspace_task_id", taskId)
+    .gte("created_at", new Date(windowStart).toISOString())
+    .lte("created_at", new Date(windowEnd).toISOString())
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .returns<{ body: string; created_at: string }[]>();
+
+  if (error) {
+    console.error("[notification-email] first message note", error);
+    return null;
+  }
+
+  const note = notes?.[0];
+  if (!note?.body?.trim()) return null;
+  return { body: note.body.trim(), created_at: note.created_at };
+}
+
+async function resolveFirstMessageForCreatedTask(
+  admin: SupabaseClient,
+  taskId: string,
+): Promise<{ text: string | null; at: string | null }> {
+  for (const delayMs of INITIAL_MESSAGE_RETRY_DELAYS_MS) {
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    const note = await loadFirstMessageNoteForTask(admin, taskId);
+    if (note) {
+      return { text: note.body, at: note.created_at };
+    }
+  }
+  return { text: null, at: null };
+}
+
 async function loadLatestNoteForTask(
   admin: SupabaseClient,
   taskId: string,
@@ -194,6 +252,8 @@ export async function buildTaskNotificationEmailInput(
 
   let commentText: string | null = null;
   let commentAt: string | null = null;
+  let firstMessageText: string | null = null;
+  let firstMessageAt: string | null = null;
 
   if (record.kind === "task_note_added") {
     const resolved = await resolveCommentForNoteNotification(
@@ -203,6 +263,15 @@ export async function buildTaskNotificationEmailInput(
     );
     commentText = resolved.text;
     commentAt = resolved.at;
+  }
+
+  if (record.kind === "task_created_assigned") {
+    const initial = await resolveFirstMessageForCreatedTask(
+      admin,
+      record.entity_id,
+    );
+    firstMessageText = initial.text;
+    firstMessageAt = initial.at;
   }
 
   const changes: TaskNotificationChange[] = [];
@@ -259,9 +328,11 @@ export async function buildTaskNotificationEmailInput(
     headline,
     assigneeDisplay,
     actorLabel,
-    occurredAt: commentAt ?? record.created_at,
+    occurredAt: firstMessageAt ?? commentAt ?? record.created_at,
     commentText,
     commentAt,
+    firstMessageText,
+    firstMessageAt,
     changes,
   };
 }

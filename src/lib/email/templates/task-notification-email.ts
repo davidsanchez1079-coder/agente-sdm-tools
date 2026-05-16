@@ -18,6 +18,9 @@ export type TaskNotificationEmailInput = {
   occurredAt: string;
   commentText: string | null;
   commentAt: string | null;
+  /** Nota inicial al crear la tarea (ventana 60 s desde `workspace_tasks.created_at`). */
+  firstMessageText: string | null;
+  firstMessageAt: string | null;
   changes: TaskNotificationChange[];
 };
 
@@ -118,15 +121,23 @@ function renderAssigneeHtml(display: string): string {
   </table>`;
 }
 
-function renderCommentHtml(text: string): string {
+function renderMessageBlockHtml(sectionTitle: string, text: string): string {
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0 0;border-collapse:collapse;">
     <tr><td style="padding:0 0 8px 0;">
-      <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Comentario</p>
+      <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">${escapeHtml(sectionTitle)}</p>
     </td></tr>
     <tr><td style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:16px 18px;">
       <p style="margin:0;font-size:15px;line-height:1.6;color:#0f172a;white-space:pre-wrap;">${escapeHtmlWithBreaks(text)}</p>
     </td></tr>
   </table>`;
+}
+
+function renderCommentHtml(text: string): string {
+  return renderMessageBlockHtml("Comentario", text);
+}
+
+function renderFirstMessageHtml(text: string): string {
+  return renderMessageBlockHtml("Primer mensaje", text);
 }
 
 export function renderTaskNotificationEmailHtml(
@@ -142,10 +153,15 @@ export function renderTaskNotificationEmailHtml(
     ? sanitizeNotificationEmailCopy(input.actorLabel)
     : null;
 
-  const preheader =
+  const preheaderSnippet =
     input.kind === "task_note_added" && input.commentText
-      ? sanitizeNotificationEmailCopy(input.commentText).replace(/\s+/g, " ").slice(0, 140)
-      : headline;
+      ? input.commentText
+      : input.kind === "task_created_assigned" && input.firstMessageText
+        ? input.firstMessageText
+        : null;
+  const preheader = preheaderSnippet
+    ? sanitizeNotificationEmailCopy(preheaderSnippet).replace(/\s+/g, " ").slice(0, 140)
+    : headline;
 
   const assigneeDisplay = sanitizeNotificationEmailCopy(input.assigneeDisplay) || "Sin responsable";
 
@@ -159,6 +175,13 @@ export function renderTaskNotificationEmailHtml(
     ${actor ? metaRow("Autor", actor) : ""}
     ${metaRow("Fecha", when)}
   </table>`;
+
+  const firstMessageBlock =
+    input.firstMessageText && input.firstMessageText.trim()
+      ? renderFirstMessageHtml(
+          sanitizeNotificationEmailCopy(input.firstMessageText),
+        )
+      : "";
 
   const commentBlock =
     input.commentText && input.commentText.trim()
@@ -180,6 +203,7 @@ export function renderTaskNotificationEmailHtml(
           <h1 style="margin:12px 0 0;font-size:20px;line-height:1.35;color:#0f172a;font-weight:700;">${escapeHtml(headline)}</h1>
           ${taskMetaTable}
           ${assigneeBlock}
+          ${firstMessageBlock}
           ${contextMetaTable}
           ${commentBlock}
           ${changesBlock}
@@ -213,6 +237,14 @@ export function renderTaskNotificationEmailText(
     lines.push(`Autor: ${sanitizeNotificationEmailCopy(input.actorLabel)}`);
   }
   lines.push(`Fecha: ${formatNotificationDateTime(input.occurredAt)}`);
+
+  if (input.firstMessageText?.trim()) {
+    lines.push(
+      "",
+      "— Primer mensaje —",
+      sanitizeNotificationEmailCopy(input.firstMessageText),
+    );
+  }
 
   if (input.commentText?.trim()) {
     lines.push("", "— Comentario —", sanitizeNotificationEmailCopy(input.commentText));
