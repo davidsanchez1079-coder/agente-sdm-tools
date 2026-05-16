@@ -1,10 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
+import { buildTaskNotificationEmailInput } from "@/lib/email/build-task-notification-email";
 import {
-  notificationInAppEmailSubject,
   renderNotificationInAppEmailHtml,
+  renderNotificationInAppEmailText,
+  notificationInAppEmailSubject,
 } from "@/lib/email/templates/notification-in-app";
+import {
+  renderTaskNotificationEmailHtml,
+  renderTaskNotificationEmailText,
+  taskNotificationEmailSubject,
+} from "@/lib/email/templates/task-notification-email";
+import type { NotificationKind } from "@/lib/notifications/types";
 
 /**
  * Webhook para correo al crear una fila en `public.notifications`.
@@ -15,8 +23,19 @@ import {
  * Headers: `x-gotia-webhook-secret: <NOTIFICATION_EMAIL_WEBHOOK_SECRET>`
  *
  * Variables en Vercel: NOTIFICATION_EMAIL_WEBHOOK_SECRET, SUPABASE_SERVICE_ROLE_KEY,
- * NEXT_PUBLIC_APP_URL (recomendado para links absolutos), RESEND_*.
+ * NEXT_PUBLIC_APP_URL (obligatorio aquí: URL pública de la app, ej. https://gotia.tudominio.mx
+ * — sin esto el webhook no puede armar enlaces y no debe usarse vercel.app por defecto), RESEND_*.
  */
+
+const TASK_KINDS = new Set<NotificationKind>([
+  "task_assigned",
+  "task_reassigned",
+  "task_note_added",
+  "task_completed",
+  "task_created_assigned",
+  "task_due_changed",
+  "task_unassigned",
+]);
 
 function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
@@ -31,9 +50,13 @@ function resolveAppBaseUrl(): string | null {
 type NotificationRecord = {
   id?: string;
   recipient_user_id?: string;
+  actor_user_id?: string | null;
+  kind?: string;
   title?: string;
   body?: string | null;
   href?: string;
+  created_at?: string;
+  data?: Record<string, unknown>;
 };
 
 function extractRecord(body: unknown): NotificationRecord | null {
@@ -46,6 +69,10 @@ function extractRecord(body: unknown): NotificationRecord | null {
     return o.record as NotificationRecord;
   }
   return null;
+}
+
+function isTaskKind(kind: string | undefined): kind is NotificationKind {
+  return Boolean(kind && TASK_KINDS.has(kind as NotificationKind));
 }
 
 export async function POST(request: NextRequest) {
@@ -117,12 +144,38 @@ export async function POST(request: NextRequest) {
   const path = record.href.startsWith("/") ? record.href : `/${record.href}`;
   const actionUrl = `${base}${path}?notificationId=${encodeURIComponent(record.id)}`;
 
-  const html = renderNotificationInAppEmailHtml({
-    title: record.title,
-    body: record.body ?? null,
-    actionUrl,
-  });
-  const subject = notificationInAppEmailSubject(record.title);
+  let subject: string;
+  let html: string;
+  let text: string;
+
+  if (isTaskKind(record.kind)) {
+    const emailInput = await buildTaskNotificationEmailInput(admin, {
+      id: record.id,
+      kind: record.kind,
+      title: record.title,
+      body: record.body ?? null,
+      href: record.href,
+      actor_user_id: record.actor_user_id ?? null,
+      created_at: record.created_at ?? new Date().toISOString(),
+      data: record.data ?? {},
+    });
+    emailInput.actionUrl = actionUrl;
+    subject = taskNotificationEmailSubject(emailInput);
+    html = renderTaskNotificationEmailHtml(emailInput);
+    text = renderTaskNotificationEmailText(emailInput);
+  } else {
+    subject = notificationInAppEmailSubject(record.title);
+    html = renderNotificationInAppEmailHtml({
+      title: record.title,
+      body: record.body ?? null,
+      actionUrl,
+    });
+    text = renderNotificationInAppEmailText({
+      title: record.title,
+      body: record.body ?? null,
+      actionUrl,
+    });
+  }
 
   const resend = new Resend(resendKey);
   const sendRes = await resend.emails.send({
@@ -130,6 +183,7 @@ export async function POST(request: NextRequest) {
     to: [to],
     subject,
     html,
+    text,
   });
 
   if (sendRes.error) {
