@@ -8,6 +8,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/lib/notifications/client";
+import { notificationKindLabel } from "@/lib/notifications/labels";
 import type { NotificationRow } from "@/lib/notifications/types";
 
 function formatTime(iso: string) {
@@ -180,7 +181,7 @@ export function NotificationsDrawer({
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                       <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 dark:border-slate-800 dark:bg-slate-900/70">
-                        {n.kind.replaceAll("_", " ")}
+                        {notificationKindLabel(n.kind)}
                       </span>
                       {!n.read_at ? (
                         <span className="text-emerald-700 dark:text-emerald-300">

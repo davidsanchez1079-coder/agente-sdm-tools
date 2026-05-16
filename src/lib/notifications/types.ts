@@ -2,7 +2,10 @@ export type NotificationKind =
   | "task_assigned"
   | "task_reassigned"
   | "task_note_added"
-  | "task_completed";
+  | "task_completed"
+  | "task_created_assigned"
+  | "task_due_changed"
+  | "task_unassigned";
 
 export type NotificationEntityType = "task";
 
