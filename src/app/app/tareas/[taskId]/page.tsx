@@ -116,7 +116,6 @@ export default function TareaDetallePage() {
   const [customerQuery, setCustomerQuery] = useState("");
 
   const [titulo, setTitulo] = useState("");
-  const [descripcion, setDescripcion] = useState("");
   const [estado, setEstado] = useState<WorkspaceTaskEstado>("pendiente");
   const [prioridad, setPrioridad] =
     useState<WorkspaceTaskPrioridad>("normal");
@@ -176,7 +175,6 @@ export default function TareaDetallePage() {
         setScope(isInternal ? "interna" : "cliente");
         setCustomerId(row.customer_id ?? "");
         setTitulo(row.titulo);
-        setDescripcion(row.descripcion ?? "");
         setEstado(row.estado);
         setPrioridad(row.prioridad);
         setAssignedToUserId(row.assigned_to_user_id ?? "");
@@ -371,7 +369,6 @@ export default function TareaDetallePage() {
       const updated = await updateWorkspaceTask(supabase, workspaceId, taskId, {
         customer_id: scope === "cliente" && customerId ? customerId : null,
         titulo: trimmed,
-        descripcion: descripcion.trim() || null,
         estado,
         prioridad,
         assigned_to_user_id: assignedToUserId ? assignedToUserId : null,

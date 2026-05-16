@@ -65,7 +65,6 @@ export default function TareasListadoPage() {
   const [altaCustomerQuery, setAltaCustomerQuery] = useState("");
   const [altaAssignedToUserId, setAltaAssignedToUserId] = useState("");
   const [altaTitulo, setAltaTitulo] = useState("");
-  const [altaDescripcion, setAltaDescripcion] = useState("");
   const [altaEstado, setAltaEstado] = useState<WorkspaceTaskEstado>("pendiente");
   const [altaPrioridad, setAltaPrioridad] =
     useState<WorkspaceTaskPrioridad>("normal");
@@ -184,7 +183,6 @@ export default function TareasListadoPage() {
         customer_id:
           altaScope === "cliente" && altaCustomerId ? altaCustomerId : null,
         titulo: altaTitulo.trim(),
-        descripcion: altaDescripcion.trim() || null,
         estado: altaEstado,
         prioridad: altaPrioridad,
         vence_el: fromDatetimeLocalValue(altaVenceElLocal),
@@ -254,7 +252,6 @@ export default function TareasListadoPage() {
       setAltaCustomerQuery("");
       setAltaAssignedToUserId("");
       setAltaTitulo("");
-      setAltaDescripcion("");
       setAltaEstado("pendiente");
       setAltaPrioridad("normal");
       setAltaVenceElLocal(addMsToNow(0));
@@ -511,18 +508,6 @@ export default function TareasListadoPage() {
                 value={altaTitulo}
                 onChange={(event) => setAltaTitulo(event.target.value)}
                 placeholder="Ej. Llamar al cliente"
-                disabled={creating}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm sm:col-span-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
-                Descripción (opcional)
-              </span>
-              <textarea
-                className={`${controlClass} min-h-[88px] resize-y`}
-                value={altaDescripcion}
-                onChange={(event) => setAltaDescripcion(event.target.value)}
-                placeholder="Notas breves…"
                 disabled={creating}
               />
             </label>
@@ -834,8 +819,6 @@ export default function TareasListadoPage() {
                       <span className="font-semibold">Última acción:</span>{" "}
                       {lastActionPreview(task.id)}
                     </>
-                  ) : task.descripcion ? (
-                    <span className="line-clamp-2">{task.descripcion}</span>
                   ) : (
                     <span className="text-slate-500 dark:text-slate-500">
                       Sin notas aún.
