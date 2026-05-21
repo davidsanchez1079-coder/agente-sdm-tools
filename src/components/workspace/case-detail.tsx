@@ -166,6 +166,9 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
   const [savingPotencial, setSavingPotencial] = useState(false);
   const [savingOperacionTipo, setSavingOperacionTipo] = useState(false);
   const [savingOperacion, setSavingOperacion] = useState(false);
+  const [editTitleOpen, setEditTitleOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [savingTitle, setSavingTitle] = useState(false);
 
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<
@@ -353,6 +356,34 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
       );
     } finally {
       setSavingResumen(false);
+    }
+  }
+
+  async function handleSaveTitle() {
+    if (!caseItem) return;
+    const next = titleDraft.trim();
+    if (!next) {
+      setMessage("El nombre del caso no puede estar vacío.");
+      return;
+    }
+    if (next === caseItem.titulo) {
+      setEditTitleOpen(false);
+      return;
+    }
+    setSavingTitle(true);
+    setMessage(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const updated = await updateCase(supabase, caseItem.id, {
+        titulo: next,
+      });
+      setCaseItem(updated);
+      setEditTitleOpen(false);
+      setMessage("Nombre actualizado.");
+    } catch (error) {
+      setMessage(formatError(error, "No se pudo actualizar el nombre."));
+    } finally {
+      setSavingTitle(false);
     }
   }
 
@@ -819,6 +850,31 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
           <h2 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
             {caseItem.titulo}
           </h2>
+          <button
+            type="button"
+            onClick={() => {
+              setTitleDraft(caseItem.titulo);
+              setEditTitleOpen(true);
+            }}
+            className="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+            title="Editar nombre"
+            aria-label="Editar nombre del caso"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -1768,6 +1824,70 @@ export function CaseDetail({ caseId }: CaseDetailProps) {
         preview={preview}
         onClose={() => setPreview(null)}
       />
+
+      {editTitleOpen ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-title-dialog-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !savingTitle) {
+              setEditTitleOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-lg dark:border-slate-800/80 dark:bg-slate-900">
+            <h3
+              id="edit-title-dialog-title"
+              className="text-lg font-semibold text-slate-900 dark:text-white"
+            >
+              Editar nombre del caso
+            </h3>
+            <label
+              htmlFor="edit-title-input"
+              className="mt-4 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400"
+            >
+              Nombre
+            </label>
+            <input
+              id="edit-title-input"
+              type="text"
+              autoFocus
+              value={titleDraft}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !savingTitle) {
+                  event.preventDefault();
+                  void handleSaveTitle();
+                } else if (event.key === "Escape" && !savingTitle) {
+                  setEditTitleOpen(false);
+                }
+              }}
+              disabled={savingTitle}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100"
+            />
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditTitleOpen(false)}
+                disabled={savingTitle}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveTitle()}
+                disabled={savingTitle || !titleDraft.trim()}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-400 dark:text-slate-950 dark:hover:bg-emerald-300"
+              >
+                {savingTitle ? "Guardando…" : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={confirmDeleteOpen}

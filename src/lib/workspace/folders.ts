@@ -216,6 +216,7 @@ export async function createCase(
 }
 
 export type UpdateCasePatch = Partial<{
+  titulo: string;
   estado: CaseEstado;
   prioridad: CasePrioridad;
   conversion_nivel: CaseConversionNivel;
