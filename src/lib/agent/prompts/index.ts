@@ -22,6 +22,8 @@ const BRAND_PROFILES: Record<Exclude<BrandId, "general" | "otro">, string> = {
   korloy: KORLOY_PROFILE,
   dormer: DORMER_PROFILE,
   amec: AMEC_PROFILE,
+  // GESAC aún no tiene modo especialista; placeholder.
+  gesac: "GESAC — Fabricante agregado al catálogo. Modo especialista pendiente.",
 };
 
 function buildModeBlock(mode: BrandId): string {

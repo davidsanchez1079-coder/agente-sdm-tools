@@ -33,7 +33,7 @@ type StoredAttachment = {
   case_id: string;
   storage_path: string;
   filename: string;
-  kind: "image" | "pdf" | "other";
+  kind: "image" | "pdf" | "video" | "other";
   mime_type: string | null;
 };
 
@@ -100,7 +100,7 @@ export async function fetchAttachmentsAsContentBlocks(
         },
       });
     }
-    // 'other' kind o mimes no soportados se saltan silenciosamente en v1.
+    // video y 'other' no se envían al modelo (evidencia o tipos no soportados).
   }
 
   return blocks;

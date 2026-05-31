@@ -32,10 +32,9 @@ import {
   type CustomerRow,
 } from "@/lib/customers/customers-db";
 import {
-  agenteFullName,
-  listAgentes,
-  type AgenteRow,
-} from "@/lib/agentes/agentes-db";
+  listShareableMembers,
+  type ShareableMember,
+} from "@/lib/cases/shares";
 
 const FABRICANTES = BRANDS.filter((brand) => brand.id !== "general");
 
@@ -46,7 +45,9 @@ export function CaseFilters() {
   const { workspaceId } = useWorkspace();
   const [panelOpen, setPanelOpen] = useState(false);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
-  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
+  const [shareableMembers, setShareableMembers] = useState<ShareableMember[]>(
+    [],
+  );
 
   const filters = useMemo(
     () => parseFiltersFromParams(new URLSearchParams(searchParams.toString())),
@@ -58,13 +59,13 @@ export function CaseFilters() {
     (async () => {
       try {
         const supabase = getSupabaseBrowserClient();
-        const [customersList, agentesList] = await Promise.all([
+        const [customersList, members] = await Promise.all([
           listCustomers(supabase, workspaceId),
-          listAgentes(supabase, workspaceId, { onlyActive: true }),
+          listShareableMembers(supabase, workspaceId, null),
         ]);
         if (!cancelled) {
           setCustomers(customersList);
-          setAgentes(agentesList);
+          setShareableMembers(members);
         }
       } catch {
         // Silencioso: si la BD falla, los pills de cliente/agente no
@@ -252,12 +253,12 @@ export function CaseFilters() {
             />
           ))}
           {filters.agentes.map((id) => {
-            const agente = agentes.find((a) => a.id === id);
-            const label = agente ? agenteFullName(agente) : id;
+            const m = shareableMembers.find((s) => s.user_id === id);
+            const label = m ? m.display_name : id;
             return (
               <Chip
                 key={`agente-${id}`}
-                label={`Agente: ${label}`}
+                label={`Secundario: ${label}`}
                 onRemove={() => handleToggleAgente(id)}
               />
             );
@@ -355,23 +356,23 @@ export function CaseFilters() {
             )}
           </FilterGroup>
 
-          <FilterGroup label="Agente involucrado">
-            {agentes.length === 0 ? (
+          <FilterGroup label="Usuario secundario en el caso">
+            {shareableMembers.length === 0 ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Aún no hay agentes activos en el catálogo.
+                No hay miembros activos en el workspace.
               </p>
             ) : (
-              agentes.map((agente) => {
-                const active = filters.agentes.includes(agente.id);
+              shareableMembers.map((m) => {
+                const active = filters.agentes.includes(m.user_id);
                 return (
                   <button
-                    key={agente.id}
+                    key={m.user_id}
                     type="button"
-                    onClick={() => handleToggleAgente(agente.id)}
+                    onClick={() => handleToggleAgente(m.user_id)}
                     className={`${pillBase} ${active ? pillActive : pillInactive}`}
                   >
-                    {agenteFullName(agente)}
-                    {agente.rol_label ? ` · ${agente.rol_label}` : ""}
+                    {m.display_name}
+                    {m.rol ? ` · ${m.rol}` : ""}
                   </button>
                 );
               })

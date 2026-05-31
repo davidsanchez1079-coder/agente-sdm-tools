@@ -90,6 +90,14 @@ export function AttachmentPreviewModal({ preview, onClose }: Props) {
             alt={preview.row.filename}
             className="max-h-full max-w-full rounded-lg object-contain shadow-xl"
           />
+        ) : preview.row.kind === "video" ? (
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            className="max-h-full max-w-full rounded-lg border border-white/20 bg-black shadow-xl"
+            src={preview.url}
+          />
         ) : preview.row.kind === "pdf" ? (
           <iframe
             src={preview.url}

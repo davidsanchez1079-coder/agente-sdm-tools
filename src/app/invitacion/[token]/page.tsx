@@ -24,6 +24,53 @@ const ROL_DESC: Record<WorkspaceMemberRol, string> = {
   externo: "Verás solo casos relacionados con las marcas que te asignaron.",
 };
 
+function getAuthErrorCode(error: unknown): string | null {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "string" && code.length > 0 ? code : null;
+  }
+  return null;
+}
+
+function isUserAlreadyRegistered(error: unknown): boolean {
+  const code = getAuthErrorCode(error);
+  if (code === "user_already_registered") return true;
+  if (error && typeof error === "object" && "message" in error) {
+    const msg = String((error as { message: unknown }).message).toLowerCase();
+    return (
+      msg.includes("already registered") ||
+      msg.includes("user already registered")
+    );
+  }
+  return false;
+}
+
+function Spinner({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <span
+      className={`inline-block shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
+      aria-hidden
+    />
+  );
+}
+
+function authErrorMessage(error: unknown, fallback: string): string {
+  const code = getAuthErrorCode(error);
+  if (code === "email_not_confirmed") {
+    return "Revisa tu correo para confirmar tu cuenta y luego vuelve a este link.";
+  }
+  if (code === "user_already_registered" || isUserAlreadyRegistered(error)) {
+    return "Ya tienes cuenta con este correo. Verifica tu contraseña.";
+  }
+  if (code === "weak_password") {
+    return "La contraseña no cumple los requisitos mínimos de seguridad.";
+  }
+  if (code === "over_request_rate_limit") {
+    return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
+  }
+  return formatError(error, fallback);
+}
+
 export default function AcceptInvitationPage() {
   const router = useRouter();
   const params = useParams<{ token: string }>();
@@ -36,9 +83,7 @@ export default function AcceptInvitationPage() {
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
 
   const [password, setPassword] = useState("");
-  const [working, setWorking] = useState<"signin" | "signup" | "accept" | null>(
-    null,
-  );
+  const [working, setWorking] = useState<"continue" | "accept" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,55 +119,72 @@ export default function AcceptInvitationPage() {
     };
   }, [token]);
 
-  async function handleSignUp() {
+  async function handleContinue() {
     if (!preview || !token) return;
     if (password.length < 8) {
       setMessage("Usa una contraseña de al menos 8 caracteres.");
       return;
     }
-    setWorking("signup");
+
+    setWorking("continue");
     setMessage(null);
+
+    const supabase = getSupabaseBrowserClient();
+    const email = preview.email;
+    const redirectTo = `${window.location.origin}/invitacion/${token}`;
+
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase.auth.signUp({
-        email: preview.email,
+      const signIn = await supabase.auth.signInWithPassword({
+        email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/invitacion/${token}`,
-        },
       });
-      if (error) throw error;
-      if (data.session) {
+
+      if (!signIn.error) {
         await runAccept();
-      } else {
+        return;
+      }
+
+      const signInCode = getAuthErrorCode(signIn.error);
+      if (signInCode !== "invalid_credentials") {
         setMessage(
-          "Cuenta creada. Revisa tu correo si Supabase pide confirmación, luego abre de nuevo este link para aceptar.",
+          authErrorMessage(signIn.error, "No se pudo iniciar sesión."),
         );
         setWorking(null);
+        return;
       }
-    } catch (error) {
+
+      const signUp = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirectTo },
+      });
+
+      if (signUp.error) {
+        if (isUserAlreadyRegistered(signUp.error)) {
+          setMessage(
+            "Ya tienes cuenta con este correo. Verifica tu contraseña.",
+          );
+        } else {
+          setMessage(
+            authErrorMessage(signUp.error, "No se pudo crear la cuenta."),
+          );
+        }
+        setWorking(null);
+        return;
+      }
+
+      if (signUp.data.session) {
+        await runAccept();
+        return;
+      }
+
       setMessage(
-        formatError(error, "No se pudo crear la cuenta."),
+        "Revisa tu correo para confirmar tu cuenta y luego vuelve a este link.",
       );
       setWorking(null);
-    }
-  }
-
-  async function handleSignIn() {
-    if (!preview) return;
-    setWorking("signin");
-    setMessage(null);
-    try {
-      const supabase = getSupabaseBrowserClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: preview.email,
-        password,
-      });
-      if (error) throw error;
-      await runAccept();
     } catch (error) {
       setMessage(
-        formatError(error, "No se pudo iniciar sesión."),
+        formatError(error, "No se pudo completar el acceso a tu cuenta."),
       );
       setWorking(null);
     }
@@ -157,10 +219,15 @@ export default function AcceptInvitationPage() {
     }
   }
 
+  const isBusy = working !== null;
+
   if (previewLoading) {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-950 px-6 text-slate-50">
-        <p className="text-sm text-slate-400">Cargando invitación…</p>
+        <p className="flex items-center gap-2 text-sm text-slate-400">
+          <Spinner className="h-5 w-5" />
+          Cargando invitación…
+        </p>
       </main>
     );
   }
@@ -216,10 +283,17 @@ export default function AcceptInvitationPage() {
           <button
             type="button"
             onClick={() => void runAccept()}
-            disabled={working !== null}
-            className="rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isBusy}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {working === "accept" ? "Aceptando…" : "Aceptar invitación"}
+            {working === "accept" ? (
+              <>
+                <Spinner />
+                Aceptando…
+              </>
+            ) : (
+              "Aceptar invitación"
+            )}
           </button>
         ) : authedEmail ? (
           <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-200">
@@ -228,9 +302,17 @@ export default function AcceptInvitationPage() {
             Cierra sesión y entra con el correo correcto para poder aceptarla.
           </div>
         ) : (
-          <div className="grid gap-4">
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleContinue();
+            }}
+          >
             <p className="text-sm leading-6 text-slate-300">
-              Crea tu cuenta o inicia sesión con <span className="font-semibold">{preview.email}</span> para activar tu acceso.
+              Ingresa tu contraseña para{" "}
+              <span className="font-semibold">{preview.email}</span> y activar
+              tu acceso.
             </p>
             <label className="grid gap-2 text-sm text-slate-200">
               Contraseña
@@ -239,33 +321,34 @@ export default function AcceptInvitationPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="al menos 8 caracteres"
+                placeholder="Mínimo 8 caracteres"
                 minLength={8}
+                autoComplete="new-password"
+                disabled={isBusy}
               />
             </label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => void handleSignUp()}
-                disabled={working !== null || password.length < 8}
-                className="rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {working === "signup" ? "Creando…" : "Crear cuenta"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSignIn()}
-                disabled={working !== null || password.length < 8}
-                className="rounded-2xl border border-slate-700 px-4 py-3 font-medium text-slate-200 transition hover:border-cyan-400 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {working === "signin" ? "Entrando…" : "Ya tengo cuenta"}
-              </button>
-            </div>
-          </div>
+            <button
+              type="submit"
+              disabled={isBusy || password.length < 8}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-cyan-400 px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isBusy ? (
+                <>
+                  <Spinner />
+                  {working === "accept" ? "Aceptando…" : "Continuando…"}
+                </>
+              ) : (
+                "Continuar"
+              )}
+            </button>
+          </form>
         )}
 
         {message ? (
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 text-sm text-slate-300">
+          <div
+            role="alert"
+            className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+          >
             {message}
           </div>
         ) : null}

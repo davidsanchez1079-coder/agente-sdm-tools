@@ -58,6 +58,14 @@ export function ModuleIcon({ id, className = "h-5 w-5" }: ModuleIconProps) {
           <path d="M11 16.5c0-2 1.5-3 3-3s3 1 3 3" />
         </svg>
       );
+    case "tareas":
+      return (
+        <svg {...base}>
+          <path d="M5 4.5h10a1 1 0 0 1 1 1v2.5H4V5.5a1 1 0 0 1 1-1z" />
+          <path d="M4 9.5h12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-7z" />
+          <path d="M7.5 12.5l2 2 3.5-3.5" />
+        </svg>
+      );
     case "accesos":
       return (
         <svg {...base}>

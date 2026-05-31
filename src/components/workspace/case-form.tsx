@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/lib/workspace/context";
 import { createCase, type CaseRow } from "@/lib/workspace/folders";
 import { BRANDS, type BrandId } from "@/lib/brands/brands";
 import {
@@ -13,10 +14,11 @@ import {
   type CasePrioridad,
 } from "@/lib/cases/cases";
 import {
-  agenteFullName,
-  listAgentes,
-  type AgenteRow,
-} from "@/lib/agentes/agentes-db";
+  addInitialCaseShares,
+  listShareableMembers,
+  type CaseSharePermission,
+  type ShareableMember,
+} from "@/lib/cases/shares";
 import { formatError } from "@/lib/errors/format";
 
 type CaseFormProps = {
@@ -38,6 +40,7 @@ export function CaseForm({
   onCreated,
   onMessage,
 }: CaseFormProps) {
+  const { appUser } = useWorkspace();
   const [titulo, setTitulo] = useState("");
   const [operacionTipo, setOperacionTipo] = useState<CaseOperacionTipo | "">(
     "",
@@ -49,8 +52,14 @@ export function CaseForm({
   const [prioridad, setPrioridad] = useState<CasePrioridad>("media");
   const [conversionNivel, setConversionNivel] =
     useState<CaseConversionNivel>("media");
-  const [secondaryAgenteId, setSecondaryAgenteId] = useState<string>("");
-  const [agentes, setAgentes] = useState<AgenteRow[]>([]);
+  const [collaboratorUserIds, setCollaboratorUserIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [initialSharePermission, setInitialSharePermission] =
+    useState<CaseSharePermission>("edit");
+  const [shareableMembers, setShareableMembers] = useState<ShareableMember[]>(
+    [],
+  );
   const [saving, setSaving] = useState(false);
 
   const tituloRef = useRef<HTMLInputElement>(null);
@@ -71,13 +80,11 @@ export function CaseForm({
     (async () => {
       try {
         const supabase = getSupabaseBrowserClient();
-        const list = await listAgentes(supabase, workspaceId, {
-          onlyActive: true,
-        });
-        if (!cancelled) setAgentes(list);
+        const list = await listShareableMembers(supabase, workspaceId, null);
+        if (!cancelled) setShareableMembers(list);
       } catch {
         // Silencioso: si falla, el selector queda vacío y se puede crear
-        // caso sin secundario.
+        // caso sin colaboradores iniciales.
       }
     })();
     return () => {
@@ -103,8 +110,41 @@ export function CaseForm({
         maquina: maquina.trim() || undefined,
         prioridad,
         conversionNivel,
-        secondaryAgenteId: secondaryAgenteId || null,
       });
+      const toShare = shareableMembers.filter(
+        (m) =>
+          collaboratorUserIds.has(m.user_id) && m.user_id !== appUser.id,
+      );
+      if (toShare.length) {
+        try {
+          await addInitialCaseShares(
+            supabase,
+            row.id,
+            appUser.id,
+            toShare,
+            initialSharePermission,
+          );
+        } catch (shareErr) {
+          onMessage?.(
+            formatError(
+              shareErr,
+              "Caso creado, pero no se pudieron aplicar todos los compartidos iniciales.",
+            ),
+          );
+          onCreated(row);
+          setTitulo("");
+          setOperacionTipo("");
+          setOperacion("");
+          setMaterial("");
+          setMaquina("");
+          setMarca("");
+          setPrioridad("media");
+          setConversionNivel("media");
+          setCollaboratorUserIds(new Set());
+          setInitialSharePermission("edit");
+          return;
+        }
+      }
       onCreated(row);
       setTitulo("");
       setOperacionTipo("");
@@ -114,8 +154,13 @@ export function CaseForm({
       setMarca("");
       setPrioridad("media");
       setConversionNivel("media");
-      setSecondaryAgenteId("");
-      onMessage?.("Caso creado.");
+      setCollaboratorUserIds(new Set());
+      setInitialSharePermission("edit");
+      onMessage?.(
+        toShare.length
+          ? "Caso creado y compartido con los colaboradores seleccionados."
+          : "Caso creado.",
+      );
     } catch (error) {
       onMessage?.(
         formatError(error, "No se pudo crear el caso."),
@@ -216,19 +261,67 @@ export function CaseForm({
         ))}
       </select>
 
-      <select
-        className={controlClass}
-        value={secondaryAgenteId}
-        onChange={(event) => setSecondaryAgenteId(event.target.value)}
-      >
-        <option value="">Sin agente secundario</option>
-        {agentes.map((agente) => (
-          <option key={agente.id} value={agente.id}>
-            Agente: {agenteFullName(agente)}
-            {agente.rol_label ? ` — ${agente.rol_label}` : ""}
-          </option>
-        ))}
-      </select>
+      <div className="grid gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+          Colaboradores iniciales (opcional)
+        </span>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Se crean como compartidos del caso (igual que en el detalle). Puedes
+          cambiarlos después en Compartir.
+        </p>
+        <label className="grid gap-1 text-sm">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">
+            Permiso para los seleccionados
+          </span>
+          <select
+            className={controlClass}
+            value={initialSharePermission}
+            onChange={(event) =>
+              setInitialSharePermission(
+                event.target.value as CaseSharePermission,
+              )
+            }
+            disabled={collaboratorUserIds.size === 0}
+          >
+            <option value="edit">Ver y editar</option>
+            <option value="view">Solo ver</option>
+          </select>
+        </label>
+        <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-900/50">
+          {shareableMembers.length === 0 ? (
+            <p className="p-3 text-xs text-slate-500">Sin miembros para listar.</p>
+          ) : (
+            shareableMembers.map((m) => (
+              <label
+                key={m.user_id}
+                className="flex cursor-pointer items-center gap-2 border-b border-slate-200 px-3 py-2 text-sm last:border-b-0 dark:border-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  className="rounded border-slate-300"
+                  disabled={m.user_id === appUser.id}
+                  checked={collaboratorUserIds.has(m.user_id)}
+                  onChange={() => {
+                    setCollaboratorUserIds((prev) => {
+                      const n = new Set(prev);
+                      if (n.has(m.user_id)) n.delete(m.user_id);
+                      else n.add(m.user_id);
+                      return n;
+                    });
+                  }}
+                />
+                <span className="text-slate-800 dark:text-slate-100">
+                  {m.display_name}{" "}
+                  <span className="text-slate-500">({m.email})</span>
+                  {m.user_id === appUser.id ? (
+                    <span className="text-xs text-slate-400"> — tú</span>
+                  ) : null}
+                </span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
 
       <button
         type="button"

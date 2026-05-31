@@ -4,6 +4,7 @@ export type ModuleId =
   | "customers"
   | "caso"
   | "agentes"
+  | "tareas"
   | "accesos"
   | "brands";
 
@@ -45,6 +46,12 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
     href: "/app/agentes",
     kicker: "Agentes",
   },
+  tareas: {
+    id: "tareas",
+    label: "Tareas",
+    href: "/app/tareas",
+    kicker: "Tareas",
+  },
   accesos: {
     id: "accesos",
     label: "Accesos",
@@ -69,6 +76,8 @@ export const MODULE_CHIP: Record<ModuleId, string> = {
   caso: "border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200",
   agentes:
     "border-teal-500/40 bg-teal-50 text-teal-700 dark:border-teal-400/40 dark:bg-teal-500/15 dark:text-teal-200",
+  tareas:
+    "border-sky-500/40 bg-sky-50 text-sky-800 dark:border-sky-400/40 dark:bg-sky-500/15 dark:text-sky-200",
   accesos:
     "border-indigo-500/40 bg-indigo-50 text-indigo-700 dark:border-indigo-400/40 dark:bg-indigo-500/15 dark:text-indigo-200",
   brands:
@@ -85,6 +94,8 @@ export const MODULE_ICON_BG: Record<ModuleId, string> = {
   caso: "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30",
   agentes:
     "bg-teal-50 text-teal-600 ring-1 ring-teal-500/20 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-400/30",
+  tareas:
+    "bg-sky-50 text-sky-700 ring-1 ring-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-400/30",
   accesos:
     "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-400/30",
   brands:
@@ -97,6 +108,7 @@ export const MODULE_BAR: Record<ModuleId, string> = {
   customers: "before:bg-cyan-500 dark:before:bg-cyan-400",
   caso: "before:bg-emerald-500 dark:before:bg-emerald-400",
   agentes: "before:bg-teal-500 dark:before:bg-teal-400",
+  tareas: "before:bg-sky-500 dark:before:bg-sky-400",
   accesos: "before:bg-indigo-500 dark:before:bg-indigo-400",
   brands: "before:bg-amber-500 dark:before:bg-amber-400",
 };
@@ -107,6 +119,7 @@ export const MODULE_HOVER_RING: Record<ModuleId, string> = {
   customers: "hover:ring-cyan-500/40 dark:hover:ring-cyan-400/40",
   caso: "hover:ring-emerald-500/40 dark:hover:ring-emerald-400/40",
   agentes: "hover:ring-teal-500/40 dark:hover:ring-teal-400/40",
+  tareas: "hover:ring-sky-500/40 dark:hover:ring-sky-400/40",
   accesos: "hover:ring-indigo-500/40 dark:hover:ring-indigo-400/40",
   brands: "hover:ring-amber-500/40 dark:hover:ring-amber-400/40",
 };
@@ -121,6 +134,8 @@ export const MODULE_ARROW: Record<ModuleId, string> = {
   caso: "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-300 dark:group-hover:text-emerald-200",
   agentes:
     "text-teal-600 group-hover:text-teal-700 dark:text-teal-300 dark:group-hover:text-teal-200",
+  tareas:
+    "text-sky-700 group-hover:text-sky-800 dark:text-sky-300 dark:group-hover:text-sky-200",
   accesos:
     "text-indigo-600 group-hover:text-indigo-700 dark:text-indigo-300 dark:group-hover:text-indigo-200",
   brands:
@@ -137,6 +152,8 @@ export const MODULE_ACTIVE_NAV: Record<ModuleId, string> = {
   caso: "border-emerald-500/30 bg-emerald-50 text-emerald-800 shadow-[inset_3px_0_0_0_rgb(16_185_129)] dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100 dark:shadow-[inset_3px_0_0_0_rgb(52_211_153)]",
   agentes:
     "border-teal-500/30 bg-teal-50 text-teal-800 shadow-[inset_3px_0_0_0_rgb(20_184_166)] dark:border-teal-400/30 dark:bg-teal-500/10 dark:text-teal-100 dark:shadow-[inset_3px_0_0_0_rgb(45_212_191)]",
+  tareas:
+    "border-sky-500/30 bg-sky-50 text-sky-900 shadow-[inset_3px_0_0_0_rgb(14_165_233)] dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-100 dark:shadow-[inset_3px_0_0_0_rgb(56_189_248)]",
   accesos:
     "border-indigo-500/30 bg-indigo-50 text-indigo-800 shadow-[inset_3px_0_0_0_rgb(99_102_241)] dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-100 dark:shadow-[inset_3px_0_0_0_rgb(129_140_248)]",
   brands:
@@ -149,6 +166,7 @@ export function moduleIdFromPath(pathname: string): ModuleId {
   if (pathname.startsWith("/app/customers")) return "customers";
   if (pathname.startsWith("/app/caso")) return "caso";
   if (pathname.startsWith("/app/agentes")) return "agentes";
+  if (pathname.startsWith("/app/tareas")) return "tareas";
   if (pathname.startsWith("/app/accesos")) return "accesos";
   if (pathname.startsWith("/app/brands")) return "brands";
   return "dashboard";

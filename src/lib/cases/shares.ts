@@ -43,36 +43,36 @@ export async function listActiveShares(
   return data ?? [];
 }
 
+type ListWorkspaceMembersForCaseFlowRow = {
+  member_id: string;
+  user_id: string;
+  email: string;
+  rol: string;
+  display_name: string;
+};
+
 export async function listShareableMembers(
   supabase: SupabaseClient,
   workspaceId: string,
+  caseId?: string | null,
 ): Promise<ShareableMember[]> {
-  const { data, error } = await supabase
-    .from("workspace_members")
-    .select("id, user_id, email, rol, users!inner(id, nombre, apellido, email)")
-    .eq("workspace_id", workspaceId)
-    .eq("activo", true)
-    .not("user_id", "is", null)
-    .not("joined_at", "is", null);
+  const { data, error } = await supabase.rpc("list_workspace_members_for_case_flow", {
+    workspace_id_input: workspaceId,
+    case_id_input: caseId ?? null,
+  });
   if (error) throw error;
-  type Row = {
-    id: string;
-    user_id: string;
-    email: string;
-    rol: "gerente" | "interno" | "externo";
-    users: { id: string; nombre: string; apellido: string | null; email: string } | null;
-  };
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = (data ?? []) as ListWorkspaceMembersForCaseFlowRow[];
   return rows.map((r) => {
-    const fullName = r.users
-      ? [r.users.nombre, r.users.apellido].filter(Boolean).join(" ").trim()
-      : "";
+    const rol =
+      r.rol === "gerente" || r.rol === "interno" || r.rol === "externo"
+        ? r.rol
+        : ("externo" as const);
     return {
-      member_id: r.id,
+      member_id: r.member_id,
       user_id: r.user_id,
       email: r.email,
-      rol: r.rol,
-      display_name: fullName || r.email,
+      rol,
+      display_name: r.display_name || r.email,
     };
   });
 }
@@ -124,6 +124,20 @@ export async function addShare(
     .single<CaseShareRow>();
   if (error) throw error;
   return data;
+}
+
+/** Tras crear un caso: comparte con varios miembros (mismo permiso). Omite al creador. */
+export async function addInitialCaseShares(
+  supabase: SupabaseClient,
+  caseId: string,
+  sharedByUserId: string,
+  members: ShareableMember[],
+  permission: CaseSharePermission,
+): Promise<void> {
+  for (const member of members) {
+    if (member.user_id === sharedByUserId) continue;
+    await addShare(supabase, caseId, member, sharedByUserId, permission);
+  }
 }
 
 export async function updateSharePermission(
